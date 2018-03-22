@@ -1,6 +1,5 @@
-# Minesweeper
-That one game that you played when couldn't connect to the internet, remade with Python &amp; Pygame.<br>
-<a href="https://www.youtube.com/watch?v=amKhwPT7Cwk&feature=youtu.be">Click here</a> for a video demonstration. 
+# Minesweeper AI
 
-Running this program requires Pygame. Download it <a href="https://bitbucket.org/pygame/pygame/downloads" target="a_blank"> here! </a> <br>
-Have fun!
+Marcelo doesn't know yet, but my Minesweeper AI will kick his AI's ass.
+
+Thanks to [domarp-j](https://github.com/domarp-j/minesweeper) for providing a nice framework for butt-kicking.
