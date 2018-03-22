@@ -18,6 +18,9 @@ XMARGIN = int((WINDOWWIDTH-(FIELDWIDTH*(BOXSIZE+GAPSIZE)))/2)
 YMARGIN = XMARGIN
 MINESTOTAL = 60
 
+LEFT_CLICK = 1
+RIGHT_CLICK = 3
+
 # assertions
 assert MINESTOTAL < FIELDHEIGHT*FIELDWIDTH, 'More mines than boxes'
 assert BOXSIZE^2 * (FIELDHEIGHT*FIELDWIDTH) < WINDOWHEIGHT*WINDOWWIDTH, 'Boxes will not fit on screen'
@@ -96,8 +99,11 @@ def main():
             elif event.type == MOUSEMOTION:
                 mouse_x, mouse_y = event.pos
             elif event.type == MOUSEBUTTONDOWN:
-                mouse_x, mouse_y = event.pos
-                mouseClicked = True
+                    if event.button == LEFT_CLICK:
+                        mouse_x, mouse_y = event.pos
+                        mouseClicked = True
+                    if event.button == RIGHT_CLICK:
+                        spacePressed = True
             elif event.type == KEYDOWN:
                 if event.key == K_SPACE:
                     spacePressed = True
