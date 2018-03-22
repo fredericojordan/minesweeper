@@ -52,6 +52,8 @@ MINEMARK_COV = RED
 FONTTYPE = 'Courier New'
 FONTSIZE = 20
 
+clock = pygame.time.Clock()
+
 def main():
 
     # initialize global variables & pygame module, set caption
@@ -75,16 +77,14 @@ def main():
 
     # set background color
     DISPLAYSURFACE.fill(BGCOLOR)
+    
+    time_elapsed_since_last_action = 0
 
     # main game loop
     while True:
 
         # check for quit function
         checkForKeyPress()
-
-        # initialize input booleans
-        mouseClicked = False
-        spacePressed = False
 
         # draw field
         DISPLAYSURFACE.fill(BGCOLOR)
@@ -96,20 +96,6 @@ def main():
         for event in pygame.event.get(): 
             if event.type == QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
                 terminate()
-            elif event.type == MOUSEMOTION:
-                mouse_x, mouse_y = event.pos
-            elif event.type == MOUSEBUTTONDOWN:
-                    if event.button == LEFT_CLICK:
-                        mouse_x, mouse_y = event.pos
-                        mouseClicked = True
-                    if event.button == RIGHT_CLICK:
-                        spacePressed = True
-            elif event.type == KEYDOWN:
-                if event.key == K_SPACE:
-                    spacePressed = True
-            elif event.type == KEYUP:
-                if event.key == K_SPACE:
-                    spacePressed = False
 
         # draw covers
         drawCovers(revealedBoxes, markedMines)
@@ -118,49 +104,25 @@ def main():
         tipFont = pygame.font.SysFont(FONTTYPE, 16) ## not using BASICFONT - too big
         drawText('Tip: Highlight a box and press space (rather than click the mouse)', tipFont, TEXTCOLOR_3, DISPLAYSURFACE, WINDOWWIDTH/2, WINDOWHEIGHT-60)
         drawText('to mark areas that you think contain mines.', tipFont, TEXTCOLOR_3, DISPLAYSURFACE, WINDOWWIDTH/2, WINDOWHEIGHT-40)
+
+        dt = clock.tick() 
+        time_elapsed_since_last_action += dt
+        
+        if time_elapsed_since_last_action > 250:
+            time_elapsed_since_last_action = 0
+        
+            info = available_info(mineField, zeroListXY, revealedBoxes, markedMines)
+            x, y = decide_some_shit(info)
             
-        # determine boxes at clicked areas
-        box_x, box_y = getBoxAtPixel(mouse_x, mouse_y)
-
-        # mouse not over a box in field
-        if (box_x, box_y) == (None, None):
-
-            # check if reset box is clicked
-            if RESET_RECT.collidepoint(mouse_x, mouse_y):
-                highlightButton(RESET_RECT)
-                if mouseClicked: 
-                    mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
-
-            # check if show box is clicked
-            if SHOW_RECT.collidepoint(mouse_x, mouse_y):
-                highlightButton(SHOW_RECT)
-                if mouseClicked:
-                    revealedBoxes = blankRevealedBoxData(True)
-
-        # mouse currently over box in field
-        else:
-
-            # highlight unrevealed box
-            if not revealedBoxes[box_x][box_y]: 
-                highlightBox(box_x, box_y)
-
-                # mark mines
-                if spacePressed:
-                    markedMines.append([box_x, box_y])
-                    
-                # reveal clicked boxes
-                if mouseClicked:
-                    revealedBoxes[box_x][box_y] = True
-
-                    # when 0 is revealed, show relevant boxes
-                    if mineField[box_x][box_y] == '[0]':
-                        showNumbers(revealedBoxes, mineField, box_x, box_y, zeroListXY)
-
-                    # when mine is revealed, show mines
-                    if mineField[box_x][box_y] == '[X]':
-                        showMines(revealedBoxes, mineField, box_x, box_y)
-                        gameOverAnimation(mineField, revealedBoxes, markedMines, 'LOSS')
-                        mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
+            revealedBoxes[x][y] = True
+            
+            if mineField[x][y] == '[0]':
+                showNumbers(revealedBoxes, mineField, x, y, zeroListXY)
+                
+            if mineField[x][y] == '[X]':
+                showMines(revealedBoxes, mineField, x, y)
+                gameOverAnimation(mineField, revealedBoxes, markedMines, 'LOSS')
+                mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
 
         # check if player has won 
         if gameWon(revealedBoxes, mineField):
@@ -518,6 +480,59 @@ def checkForKeyPress():
     if keyUpEvents[0].key == K_ESCAPE:
         terminate()
     return keyUpEvents[0].key
+
+def debug_board(board, title=None):
+    if title:
+        print(title)
+    for y in range(len(board)):
+        print([board[x][y] for x in range(len(board[y]))])
+    print()
+
+
+def available_info(mineField, zeroListXY, revealedBoxes, markedMines):
+    info = []
+    
+    for x in range(len(mineField)):
+        line = []
+        for y in range(len(mineField[x])):
+            if [x,y] in markedMines:
+                line.append(-2)
+            else:
+                line.append(int(mineField[x][y][1:-1]) if revealedBoxes[x][y] else -1)
+        info.append(line)
+
+#     debug_board(info, 'info')
+    return info
+
+
+def neighbour_squares(square, min_x=0, max_x=None, min_y=0, max_y=None):
+    neighbours = []
+    for i in range(-1, 2):
+        for j in range(-1, 2):
+            neighbours.append([square[0]+i, square[1]+j])
+    neighbours.remove(square)
+    
+    if min_x is not None:
+        neighbours = [item for item in neighbours if item[0] >= min_x]
+     
+    if max_x is not None:
+        neighbours = [item for item in neighbours if item[0] <= max_x]
+                 
+    if min_y is not None:
+        neighbours = [item for item in neighbours if item[1] >= min_y]
+     
+    if max_y is not None:
+        neighbours = [item for item in neighbours if item[1] <= max_y]
+    
+    return neighbours
+
+
+def decide_some_shit(available_info):
+    for x in range(len(available_info)):
+        for y in range(len(available_info[x])):
+            if available_info[x][y] == -1:
+                return x, y
+    return 0, 0
 
 # run code
 if __name__ == '__main__':
