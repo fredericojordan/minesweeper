@@ -21,7 +21,7 @@ MINESTOTAL = 60
 LEFT_CLICK = 1
 RIGHT_CLICK = 3
 
-AI = False
+AI = True
 
 # assertions
 assert MINESTOTAL < FIELDHEIGHT*FIELDWIDTH, 'More mines than boxes'
@@ -131,44 +131,50 @@ def main():
             dt = clock.tick()
             time_elapsed_since_last_action += dt
 
-            if time_elapsed_since_last_action > 250:
-                time_elapsed_since_last_action = 0
+#             if time_elapsed_since_last_action > 250:
+#                 time_elapsed_since_last_action = 0
 
-                info = available_info(mineField, zeroListXY, revealedBoxes, markedMines)
-                x, y = decide_some_shit(info)
+            info = available_info(mineField, zeroListXY, revealedBoxes, markedMines)
+            squares = AI_mark_squares(info)
+            for s in squares:
+                markedMines.append([s[0], s[1]])
+            squares = AI_reveal_squares(info)
+            for s in squares:
+                revealedBoxes[s[0]][s[1]] = True
+
+        # determine boxes at clicked areas
+        box_x, box_y = getBoxAtPixel(mouse_x, mouse_y)
+
+        # mouse not over a box in field
+        if (box_x, box_y) == (None, None):
+
+            # check if reset box is clicked
+            if RESET_RECT.collidepoint(mouse_x, mouse_y):
+                highlightButton(RESET_RECT)
+                if mouseClicked:
+                    mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
+
+            # check if show box is clicked
+            if SHOW_RECT.collidepoint(mouse_x, mouse_y):
+                highlightButton(SHOW_RECT)
+                if mouseClicked:
+                    revealedBoxes = blankRevealedBoxData(True)
+
+        # mouse currently over box in field
         else:
-            # determine boxes at clicked areas
-            box_x, box_y = getBoxAtPixel(mouse_x, mouse_y)
+#             print(hidden_neighbours([box_x, box_y], available_info(mineField, zeroListXY, revealedBoxes, markedMines)))
 
-            # mouse not over a box in field
-            if (box_x, box_y) == (None, None):
+            # highlight unrevealed box
+            if not revealedBoxes[box_x][box_y]:
+                highlightBox(box_x, box_y)
 
-                # check if reset box is clicked
-                if RESET_RECT.collidepoint(mouse_x, mouse_y):
-                    highlightButton(RESET_RECT)
-                    if mouseClicked:
-                        mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
+                # mark mines
+                if spacePressed:
+                    markedMines.append([box_x, box_y])
 
-                # check if show box is clicked
-                if SHOW_RECT.collidepoint(mouse_x, mouse_y):
-                    highlightButton(SHOW_RECT)
-                    if mouseClicked:
-                        revealedBoxes = blankRevealedBoxData(True)
-
-            # mouse currently over box in field
-            else:
-
-                # highlight unrevealed box
-                if not revealedBoxes[box_x][box_y]:
-                    highlightBox(box_x, box_y)
-
-                    # mark mines
-                    if spacePressed:
-                        markedMines.append([box_x, box_y])
-
-                    # reveal clicked boxes
-                    if mouseClicked:
-                        x, y = box_x, box_y
+                # reveal clicked boxes
+                if mouseClicked:
+                    x, y = box_x, box_y
 
 
         if x and y:
@@ -499,7 +505,7 @@ def gameOverAnimation(mineField, revealedBoxes, markedMines, result):
     else:
         r, g, b = RED
 
-    for i in range(5):
+    for i in range(1):
         for start, end, step in ((0, 255, 1), (255, 0, -1)):
             for alpha in range(start, end, animationSpeed*step): # animation loop
                 checkForKeyPress()
@@ -556,14 +562,17 @@ def available_info(mineField, zeroListXY, revealedBoxes, markedMines):
             if [x,y] in markedMines:
                 line.append(-2)
             else:
-                line.append(int(mineField[x][y][1:-1]) if revealedBoxes[x][y] else -1)
+                try:
+                    line.append(int(mineField[x][y][1:-1]) if revealedBoxes[x][y] else -1)
+                except:
+                    line.append('X')
         info.append(line)
 
 #     debug_board(info, 'info')
     return info
 
 
-def neighbour_squares(square, min_x=0, max_x=None, min_y=0, max_y=None):
+def neighbour_squares(square, min_x=0, max_x=FIELDWIDTH-1, min_y=0, max_y=FIELDHEIGHT-1):
     neighbours = []
     for i in range(-1, 2):
         for j in range(-1, 2):
@@ -585,7 +594,7 @@ def neighbour_squares(square, min_x=0, max_x=None, min_y=0, max_y=None):
     return neighbours
 
 
-def count_hidden_neighbours(square, available_info):
+def hidden_neighbours(square, available_info):
     hidden_squares = []
     for neighbour in neighbour_squares(square):
         x = neighbour[0]
@@ -595,12 +604,35 @@ def count_hidden_neighbours(square, available_info):
     return hidden_squares
 
 
-def decide_some_shit(available_info):
+def marked_neighbours(square, available_info):
+    marked_squares = []
+    for neighbour in neighbour_squares(square):
+        x = neighbour[0]
+        y = neighbour[1]
+        if available_info[x][y] == -2:
+            marked_squares.append(neighbour)
+    return marked_squares
+
+
+def AI_mark_squares(available_info):
+    marked = []
     for x in range(len(available_info)):
         for y in range(len(available_info[x])):
-            if available_info[x][y] == -1:
-                return x, y
-    return 0, 0
+            neighbours = hidden_neighbours([x, y], available_info)
+            neighbours.extend(marked_neighbours([x, y], available_info))
+            if available_info[x][y] == len(neighbours):
+                marked.extend(neighbours)
+    return marked
+
+
+def AI_reveal_squares(available_info):
+    revealed = []
+    for x in range(len(available_info)):
+        for y in range(len(available_info[x])):
+            marked = marked_neighbours([x, y], available_info)
+            if available_info[x][y] == len(marked):
+                revealed.extend(hidden_neighbours([x, y], available_info))
+    return revealed
 
 # run code
 if __name__ == '__main__':
