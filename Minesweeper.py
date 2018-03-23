@@ -21,6 +21,8 @@ MINESTOTAL = 60
 LEFT_CLICK = 1
 RIGHT_CLICK = 3
 
+AI = False
+
 # assertions
 assert MINESTOTAL < FIELDHEIGHT*FIELDWIDTH, 'More mines than boxes'
 assert BOXSIZE^2 * (FIELDHEIGHT*FIELDWIDTH) < WINDOWHEIGHT*WINDOWWIDTH, 'Boxes will not fit on screen'
@@ -86,16 +88,34 @@ def main():
         # check for quit function
         checkForKeyPress()
 
+        # initialize input booleans
+        mouseClicked = False
+        spacePressed = False
+
         # draw field
         DISPLAYSURFACE.fill(BGCOLOR)
         pygame.draw.rect(DISPLAYSURFACE, FIELDCOLOR, (XMARGIN-5, YMARGIN-5, (BOXSIZE+GAPSIZE)*FIELDWIDTH+5, (BOXSIZE+GAPSIZE)*FIELDHEIGHT+5))
         drawField()
-        drawMinesNumbers(mineField)        
+        drawMinesNumbers(mineField)
 
         # event handling loop
-        for event in pygame.event.get(): 
+        for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
                 terminate()
+            elif event.type == MOUSEMOTION:
+                mouse_x, mouse_y = event.pos
+            elif event.type == MOUSEBUTTONDOWN:
+                if event.button == LEFT_CLICK:
+                    mouse_x, mouse_y = event.pos
+                    mouseClicked = True
+                if event.button == RIGHT_CLICK:
+                    spacePressed = True
+            elif event.type == KEYDOWN:
+                if event.key == K_SPACE:
+                    spacePressed = True
+            elif event.type == KEYUP:
+                if event.key == K_SPACE:
+                    spacePressed = False
 
         # draw covers
         drawCovers(revealedBoxes, markedMines)
@@ -105,20 +125,58 @@ def main():
         drawText('Tip: Highlight a box and press space (rather than click the mouse)', tipFont, TEXTCOLOR_3, DISPLAYSURFACE, WINDOWWIDTH/2, WINDOWHEIGHT-60)
         drawText('to mark areas that you think contain mines.', tipFont, TEXTCOLOR_3, DISPLAYSURFACE, WINDOWWIDTH/2, WINDOWHEIGHT-40)
 
-        dt = clock.tick() 
-        time_elapsed_since_last_action += dt
-        
-        if time_elapsed_since_last_action > 250:
-            time_elapsed_since_last_action = 0
-        
-            info = available_info(mineField, zeroListXY, revealedBoxes, markedMines)
-            x, y = decide_some_shit(info)
-            
+        x, y = None, None
+
+        if AI:
+            dt = clock.tick()
+            time_elapsed_since_last_action += dt
+
+            if time_elapsed_since_last_action > 250:
+                time_elapsed_since_last_action = 0
+
+                info = available_info(mineField, zeroListXY, revealedBoxes, markedMines)
+                x, y = decide_some_shit(info)
+        else:
+            # determine boxes at clicked areas
+            box_x, box_y = getBoxAtPixel(mouse_x, mouse_y)
+
+            # mouse not over a box in field
+            if (box_x, box_y) == (None, None):
+
+                # check if reset box is clicked
+                if RESET_RECT.collidepoint(mouse_x, mouse_y):
+                    highlightButton(RESET_RECT)
+                    if mouseClicked:
+                        mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
+
+                # check if show box is clicked
+                if SHOW_RECT.collidepoint(mouse_x, mouse_y):
+                    highlightButton(SHOW_RECT)
+                    if mouseClicked:
+                        revealedBoxes = blankRevealedBoxData(True)
+
+            # mouse currently over box in field
+            else:
+
+                # highlight unrevealed box
+                if not revealedBoxes[box_x][box_y]:
+                    highlightBox(box_x, box_y)
+
+                    # mark mines
+                    if spacePressed:
+                        markedMines.append([box_x, box_y])
+
+                    # reveal clicked boxes
+                    if mouseClicked:
+                        x, y = box_x, box_y
+
+
+        if x and y:
             revealedBoxes[x][y] = True
-            
+
             if mineField[x][y] == '[0]':
                 showNumbers(revealedBoxes, mineField, x, y, zeroListXY)
-                
+
             if mineField[x][y] == '[X]':
                 showMines(revealedBoxes, mineField, x, y)
                 gameOverAnimation(mineField, revealedBoxes, markedMines, 'LOSS')
@@ -525,6 +583,16 @@ def neighbour_squares(square, min_x=0, max_x=None, min_y=0, max_y=None):
         neighbours = [item for item in neighbours if item[1] <= max_y]
     
     return neighbours
+
+
+def count_hidden_neighbours(square, available_info):
+    hidden_squares = []
+    for neighbour in neighbour_squares(square):
+        x = neighbour[0]
+        y = neighbour[1]
+        if available_info[x][y] == -1:
+            hidden_squares.append(neighbour)
+    return hidden_squares
 
 
 def decide_some_shit(available_info):
