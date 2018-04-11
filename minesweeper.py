@@ -8,15 +8,15 @@ from pygame.locals import *
 
 # set constants
 FPS = 30
-WINDOWWIDTH = 800
-WINDOWHEIGHT = 900
+WINDOWWIDTH = 400
+WINDOWHEIGHT = 500
 BOXSIZE = 30
 GAPSIZE = 5
-FIELDWIDTH = 20
-FIELDHEIGHT = 20
+FIELDWIDTH = 9
+FIELDHEIGHT = 9
 XMARGIN = int((WINDOWWIDTH-(FIELDWIDTH*(BOXSIZE+GAPSIZE)))/2)
 YMARGIN = XMARGIN
-MINESTOTAL = 60
+MINESTOTAL = 10
 
 LEFT_CLICK = 1
 RIGHT_CLICK = 3
@@ -53,123 +53,164 @@ FONTTYPE = 'Courier New'
 FONTSIZE = 20
 
 def main():
+    play = 0
+    win = False
+    tries = 0
+    database = []
+    while win == False:
+        restar = False
+        
+        # initialize global variables & pygame module, set caption
+        global FPSCLOCK, DISPLAYSURFACE, BASICFONT, RESET_SURF, RESET_RECT, SHOW_SURF, SHOW_RECT
+        pygame.init()
+        pygame.display.set_caption('Minesweeper')
+        FPSCLOCK = pygame.time.Clock()
+        DISPLAYSURFACE = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
+        BASICFONT = pygame.font.SysFont(FONTTYPE, FONTSIZE)
 
-    # initialize global variables & pygame module, set caption
-    global FPSCLOCK, DISPLAYSURFACE, BASICFONT, RESET_SURF, RESET_RECT, SHOW_SURF, SHOW_RECT
-    pygame.init()
-    pygame.display.set_caption('Minesweeper')
-    FPSCLOCK = pygame.time.Clock()
-    DISPLAYSURFACE = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
-    BASICFONT = pygame.font.SysFont(FONTTYPE, FONTSIZE)
+        # obtain reset & show objects and rects
+        RESET_SURF, RESET_RECT = drawButton('RESET', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-120)
+        SHOW_SURF, SHOW_RECT = drawButton('SHOW ALL', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-95)
 
-    # obtain reset & show objects and rects
-    RESET_SURF, RESET_RECT = drawButton('RESET', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-120)
-    SHOW_SURF, SHOW_RECT = drawButton('SHOW ALL', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-95)
+        # stores XY of mouse events
+        mouse_x = 0
+        mouse_y = 0
 
-    # stores XY of mouse events
-    mouse_x = 0
-    mouse_y = 0
+        # set up data structures and lists
+        mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
 
-    # set up data structures and lists
-    mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
-
-    # set background color
-    DISPLAYSURFACE.fill(BGCOLOR)
-
-    # main game loop
-    while True:
-
-        # check for quit function
-        checkForKeyPress()
-
-        # initialize input booleans
-        mouseClicked = False
-        spacePressed = False
-
-        # draw field
+        # set background color
         DISPLAYSURFACE.fill(BGCOLOR)
-        pygame.draw.rect(DISPLAYSURFACE, FIELDCOLOR, (XMARGIN-5, YMARGIN-5, (BOXSIZE+GAPSIZE)*FIELDWIDTH+5, (BOXSIZE+GAPSIZE)*FIELDHEIGHT+5))
-        drawField()
-        drawMinesNumbers(mineField)        
 
-        # event handling loop
-        for event in pygame.event.get(): 
-            if event.type == QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
-                terminate()
-            elif event.type == MOUSEMOTION:
-                mouse_x, mouse_y = event.pos
-            elif event.type == MOUSEBUTTONDOWN:
+        # main game loop
+        while restar == False:
+
+            # check for quit function
+            checkForKeyPress()
+
+            # initialize input booleans
+            mouseClicked = False
+            spacePressed = False
+
+            # draw field
+            DISPLAYSURFACE.fill(BGCOLOR)
+            pygame.draw.rect(DISPLAYSURFACE, FIELDCOLOR, (XMARGIN-5, YMARGIN-5, (BOXSIZE+GAPSIZE)*FIELDWIDTH+5, (BOXSIZE+GAPSIZE)*FIELDHEIGHT+5))
+            drawField()
+            drawMinesNumbers(mineField)        
+
+            # event handling loop
+            for event in pygame.event.get():
+                
+                if event.type == QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
+                    terminate()
+                elif event.type == MOUSEMOTION:
+                    mouse_x, mouse_y = event.pos
+                elif event.type == MOUSEBUTTONDOWN:
                     if event.button == LEFT_CLICK:
                         mouse_x, mouse_y = event.pos
                         mouseClicked = True
                     if event.button == RIGHT_CLICK:
                         spacePressed = True
-            elif event.type == KEYDOWN:
-                if event.key == K_SPACE:
-                    spacePressed = True
-            elif event.type == KEYUP:
-                if event.key == K_SPACE:
-                    spacePressed = False
 
-        # draw covers
-        drawCovers(revealedBoxes, markedMines)
+                elif event.type == KEYDOWN:
+                    if event.key == K_SPACE:
+                        spacePressed = True
+                elif event.type == KEYUP:
+                    if event.key == K_SPACE:
+                        spacePressed = False
 
-        # mine marker tip
-        tipFont = pygame.font.SysFont(FONTTYPE, 16) ## not using BASICFONT - too big
-        drawText('Tip: Highlight a box and press space (rather than click the mouse)', tipFont, TEXTCOLOR_3, DISPLAYSURFACE, WINDOWWIDTH/2, WINDOWHEIGHT-60)
-        drawText('to mark areas that you think contain mines.', tipFont, TEXTCOLOR_3, DISPLAYSURFACE, WINDOWWIDTH/2, WINDOWHEIGHT-40)
-            
-        # determine boxes at clicked areas
-        box_x, box_y = getBoxAtPixel(mouse_x, mouse_y)
+            # draw covers
+            drawCovers(revealedBoxes, markedMines)
 
-        # mouse not over a box in field
-        if (box_x, box_y) == (None, None):
+            # mine marker tip
+            tipFont = pygame.font.SysFont(FONTTYPE, 16) ## not using BASICFONT - too big
+            drawText('Tip: Highlight a box and press space (rather than click the mouse)', tipFont, TEXTCOLOR_3, DISPLAYSURFACE, WINDOWWIDTH/2, WINDOWHEIGHT-60)
+            drawText('to mark areas that you think contain mines.', tipFont, TEXTCOLOR_3, DISPLAYSURFACE, WINDOWWIDTH/2, WINDOWHEIGHT-40)
+                
+            # determine boxes at clicked areas
+            #box_x, box_y = getBoxAtPixel(mouse_x, mouse_y)
+            box_x, box_y = (random.choice(range(FIELDWIDTH)),random.choice(range(FIELDHEIGHT)))
+            mouseClicked = True
 
-            # check if reset box is clicked
-            if RESET_RECT.collidepoint(mouse_x, mouse_y):
-                highlightButton(RESET_RECT)
-                if mouseClicked: 
-                    mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
+            # mouse not over a box in field
+            if (box_x, box_y) == (None, None):
 
-            # check if show box is clicked
-            if SHOW_RECT.collidepoint(mouse_x, mouse_y):
-                highlightButton(SHOW_RECT)
-                if mouseClicked:
-                    revealedBoxes = blankRevealedBoxData(True)
-
-        # mouse currently over box in field
-        else:
-
-            # highlight unrevealed box
-            if not revealedBoxes[box_x][box_y]: 
-                highlightBox(box_x, box_y)
-
-                # mark mines
-                if spacePressed:
-                    markedMines.append([box_x, box_y])
-                    
-                # reveal clicked boxes
-                if mouseClicked:
-                    revealedBoxes[box_x][box_y] = True
-
-                    # when 0 is revealed, show relevant boxes
-                    if mineField[box_x][box_y] == '[0]':
-                        showNumbers(revealedBoxes, mineField, box_x, box_y, zeroListXY)
-
-                    # when mine is revealed, show mines
-                    if mineField[box_x][box_y] == '[X]':
-                        showMines(revealedBoxes, mineField, box_x, box_y)
-                        gameOverAnimation(mineField, revealedBoxes, markedMines, 'LOSS')
+                # check if reset box is clicked
+                if RESET_RECT.collidepoint(mouse_x, mouse_y):
+                    highlightButton(RESET_RECT)
+                    if mouseClicked: 
                         mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
 
-        # check if player has won 
-        if gameWon(revealedBoxes, mineField):
-            gameOverAnimation(mineField, revealedBoxes, markedMines, 'WIN')
-            mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
-            
-        # redraw screen, wait clock tick
-        pygame.display.update()
-        FPSCLOCK.tick(FPS)
+                # check if show box is clicked
+                if SHOW_RECT.collidepoint(mouse_x, mouse_y):
+                    highlightButton(SHOW_RECT)
+                    if mouseClicked:
+                        revealedBoxes = blankRevealedBoxData(True)
+
+            # mouse currently over box in field
+            else:
+
+                # highlight unrevealed box
+                if not revealedBoxes[box_x][box_y]: 
+                    highlightBox(box_x, box_y)
+
+                    # mark mines
+                    if spacePressed:
+                        markedMines.append([box_x, box_y])
+                        
+                    # reveal clicked boxes
+                    if mouseClicked:
+                        revealedBoxes[box_x][box_y] = True
+                        turn = saveTurn(mineField, revealedBoxes)
+                        if turn[-1] > 70:
+                            print('WIN!!!')
+                            win = True
+                        database.append(turn)
+                        #print(database[play])      
+                        play += 1
+
+                        # when 0 is revealed, show relevant boxes
+                        if mineField[box_x][box_y] == '[0]':
+                            showNumbers(revealedBoxes, mineField, box_x, box_y, zeroListXY)
+
+                        # when mine is revealed, show mines
+                        if mineField[box_x][box_y] == '[X]':
+                            showMines(revealedBoxes, mineField, box_x, box_y)
+                            #gameOverAnimation(mineField, revealedBoxes, markedMines, 'LOSS')
+                            mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
+                            restar = True
+
+            # check if player has won 
+            if gameWon(revealedBoxes, mineField):
+                #gameOverAnimation(mineField, revealedBoxes, markedMines, 'WIN')
+                mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
+                restar = True
+                
+            # redraw screen, wait clock tick
+            pygame.display.update()
+            FPSCLOCK.tick(FPS)
+        
+        tries +=1
+        print(tries)
+def saveTurn(mineField, revealedBoxes):
+    
+    turn = []
+    for box_x in range(FIELDWIDTH):
+        col =[]
+        for box_y in range(FIELDHEIGHT):
+            if revealedBoxes[box_x][box_y]:
+                try:
+                    col.append(int(mineField[box_x][box_y][1]))
+                except:
+                    col.append(100)
+            else:
+                col.append(-1)
+        turn.append(col)
+    score = 0
+    for col in turn:
+        score += sum(i > -1 for i in col)
+    turn.append(score)
+    return(turn)
     
 def blankField():
 
@@ -472,7 +513,7 @@ def gameOverAnimation(mineField, revealedBoxes, markedMines, result):
     origSurf = DISPLAYSURFACE.copy()
     flashSurf = pygame.Surface(DISPLAYSURFACE.get_size())
     flashSurf = flashSurf.convert_alpha()
-    animationSpeed = 20
+    animationSpeed = 2000
 
     if result == 'WIN':
         r, g, b = BLUE
