@@ -1,15 +1,10 @@
-# By Pramod Jacob
-
-## REQUIRED FIXES
-## 1) game should pause upon fail - currently flashes for few seconds and resets 
-
 import random, pygame, sys
 from pygame.locals import *
 
 # set constants
 FPS = 30
 WINDOWWIDTH = 400
-WINDOWHEIGHT = 500
+WINDOWHEIGHT = 490
 BOXSIZE = 30
 GAPSIZE = 5
 FIELDWIDTH = 9
@@ -67,8 +62,8 @@ def main():
     BASICFONT = pygame.font.SysFont(FONTTYPE, FONTSIZE)
 
     # obtain reset & show objects and rects
-    RESET_SURF, RESET_RECT = drawButton('RESET', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-120)
-    SHOW_SURF, SHOW_RECT = drawButton('SHOW ALL', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-95)
+    RESET_SURF, RESET_RECT = drawButton('RESET', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-75)
+    SHOW_SURF, SHOW_RECT = drawButton('SHOW ALL', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-50)
     
     # set background color
     DISPLAYSURFACE.fill(BGCOLOR)
@@ -122,15 +117,20 @@ def main():
 
             # draw covers
             drawCovers(revealedBoxes, markedMines)
-
-            # mine marker tip
-            tipFont = pygame.font.SysFont(FONTTYPE, 16) ## not using BASICFONT - too big
-            drawText('Tip: Highlight a box and press space (rather than click the mouse)', tipFont, TEXTCOLOR_3, DISPLAYSURFACE, WINDOWWIDTH/2, WINDOWHEIGHT-60)
-            drawText('to mark areas that you think contain mines.', tipFont, TEXTCOLOR_3, DISPLAYSURFACE, WINDOWWIDTH/2, WINDOWHEIGHT-40)
-                
+  
             # determine boxes at clicked areas
             #box_x, box_y = getBoxAtPixel(mouse_x, mouse_y)
-            box_x, box_y = (random.choice(range(FIELDWIDTH)),random.choice(range(FIELDHEIGHT)))
+            
+            info = available_info(mineField, zeroListXY, revealedBoxes, markedMines)
+            
+            for s in AI_mark_squares(info):
+                markedMines.append([s[0], s[1]])
+
+            safe_squares = AI_reveal_safe_squares(info)
+            if safe_squares:
+                box_x, box_y = safe_squares[0][0], safe_squares[0][1]
+            else:
+                box_x, box_y = (random.choice(range(FIELDWIDTH)),random.choice(range(FIELDHEIGHT)))
             mouseClicked = True
 
             # mouse not over a box in field
@@ -193,6 +193,7 @@ def main():
         
         tries +=1
         print(tries)
+
 def saveTurn(mineField, revealedBoxes):
     
     turn = []
@@ -212,7 +213,7 @@ def saveTurn(mineField, revealedBoxes):
         score += sum(i > -1 for i in col)
     turn.append(score)
     return(turn)
-    
+
 def blankField():
 
    # creates blank FIELDWIDTH x FIELDHEIGHT data structure
@@ -521,7 +522,7 @@ def gameOverAnimation(mineField, revealedBoxes, markedMines, result):
     else:
         r, g, b = RED
 
-    for i in range(5):
+    for i in range(1):
         for start, end, step in ((0, 255, 1), (255, 0, -1)):
             for alpha in range(start, end, animationSpeed*step): # animation loop
                 checkForKeyPress()
@@ -531,11 +532,8 @@ def gameOverAnimation(mineField, revealedBoxes, markedMines, result):
                 pygame.draw.rect(DISPLAYSURFACE, FIELDCOLOR, (XMARGIN-5, YMARGIN-5, (BOXSIZE+GAPSIZE)*FIELDWIDTH+5, (BOXSIZE+GAPSIZE)*FIELDHEIGHT+5))
                 drawField()
                 drawMinesNumbers(mineField)
-                tipFont = pygame.font.SysFont(FONTTYPE, 16) ## not using BASICFONT - too big
-                drawText('Tip: Highlight a box and press space (rather than click the mouse)', tipFont, TEXTCOLOR_3, DISPLAYSURFACE, WINDOWWIDTH/2, WINDOWHEIGHT-60)
-                drawText('to mark areas that you think contain mines.', tipFont, TEXTCOLOR_3, DISPLAYSURFACE, WINDOWWIDTH/2, WINDOWHEIGHT-40)
-                RESET_SURF, RESET_RECT = drawButton('RESET', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-120)
-                SHOW_SURF, SHOW_RECT = drawButton('SHOW ALL', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-95)
+                RESET_SURF, RESET_RECT = drawButton('RESET', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-75)
+                SHOW_SURF, SHOW_RECT = drawButton('SHOW ALL', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-50)
                 drawCovers(revealedBoxes, markedMines)
                 pygame.display.update()
                 FPSCLOCK.tick(FPS)
@@ -560,6 +558,96 @@ def checkForKeyPress():
     if keyUpEvents[0].key == K_ESCAPE:
         terminate()
     return keyUpEvents[0].key
+
+def debug_board(board, title=None):
+    if title:
+        print(title)
+    for y in range(len(board)):
+        print([board[x][y] for x in range(len(board[y]))])
+    print()
+
+
+def available_info(mineField, zeroListXY, revealedBoxes, markedMines):
+    info = []
+    
+    for x in range(len(mineField)):
+        line = []
+        for y in range(len(mineField[x])):
+            if [x,y] in markedMines:
+                line.append(-2)
+            else:
+                try:
+                    line.append(int(mineField[x][y][1:-1]) if revealedBoxes[x][y] else -1)
+                except:
+                    line.append('X')
+        info.append(line)
+
+#     debug_board(info, 'info')
+    return info
+
+
+def neighbour_squares(square, min_x=0, max_x=FIELDWIDTH-1, min_y=0, max_y=FIELDHEIGHT-1):
+    neighbours = []
+    for i in range(-1, 2):
+        for j in range(-1, 2):
+            neighbours.append([square[0]+i, square[1]+j])
+    neighbours.remove(square)
+    
+    if min_x is not None:
+        neighbours = [item for item in neighbours if item[0] >= min_x]
+     
+    if max_x is not None:
+        neighbours = [item for item in neighbours if item[0] <= max_x]
+                 
+    if min_y is not None:
+        neighbours = [item for item in neighbours if item[1] >= min_y]
+     
+    if max_y is not None:
+        neighbours = [item for item in neighbours if item[1] <= max_y]
+    
+    return neighbours
+
+
+def hidden_neighbours(square, available_info):
+    hidden_squares = []
+    for neighbour in neighbour_squares(square):
+        x = neighbour[0]
+        y = neighbour[1]
+        if available_info[x][y] == -1:
+            hidden_squares.append(neighbour)
+    return hidden_squares
+
+
+def marked_neighbours(square, available_info):
+    marked_squares = []
+    for neighbour in neighbour_squares(square):
+        x = neighbour[0]
+        y = neighbour[1]
+        if available_info[x][y] == -2:
+            marked_squares.append(neighbour)
+    return marked_squares
+
+
+def AI_mark_squares(available_info):
+    marked = []
+    for x in range(len(available_info)):
+        for y in range(len(available_info[x])):
+            neighbours = hidden_neighbours([x, y], available_info)
+            neighbours.extend(marked_neighbours([x, y], available_info))
+            if available_info[x][y] == len(neighbours):
+                marked.extend(neighbours)
+    return marked
+
+
+def AI_reveal_safe_squares(available_info):
+    revealed = []
+    for x in range(len(available_info)):
+        for y in range(len(available_info[x])):
+            marked = marked_neighbours([x, y], available_info)
+            if available_info[x][y] == len(marked):
+                revealed.extend(hidden_neighbours([x, y], available_info))
+    return revealed
+
 
 # run code
 if __name__ == '__main__':
