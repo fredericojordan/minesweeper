@@ -57,30 +57,31 @@ def main():
     win = False
     tries = 0
     database = []
+    
+    # initialize global variables & pygame module, set caption
+    global FPSCLOCK, DISPLAYSURFACE, BASICFONT, RESET_SURF, RESET_RECT, SHOW_SURF, SHOW_RECT
+    pygame.init()
+    pygame.display.set_caption('Minesweeper')
+    FPSCLOCK = pygame.time.Clock()
+    DISPLAYSURFACE = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
+    BASICFONT = pygame.font.SysFont(FONTTYPE, FONTSIZE)
+
+    # obtain reset & show objects and rects
+    RESET_SURF, RESET_RECT = drawButton('RESET', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-120)
+    SHOW_SURF, SHOW_RECT = drawButton('SHOW ALL', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-95)
+    
+    # set background color
+    DISPLAYSURFACE.fill(BGCOLOR)
+    
+    # stores XY of mouse events
+    mouse_x = 0
+    mouse_y = 0
+    
     while win == False:
         restar = False
-        
-        # initialize global variables & pygame module, set caption
-        global FPSCLOCK, DISPLAYSURFACE, BASICFONT, RESET_SURF, RESET_RECT, SHOW_SURF, SHOW_RECT
-        pygame.init()
-        pygame.display.set_caption('Minesweeper')
-        FPSCLOCK = pygame.time.Clock()
-        DISPLAYSURFACE = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
-        BASICFONT = pygame.font.SysFont(FONTTYPE, FONTSIZE)
-
-        # obtain reset & show objects and rects
-        RESET_SURF, RESET_RECT = drawButton('RESET', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-120)
-        SHOW_SURF, SHOW_RECT = drawButton('SHOW ALL', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-95)
-
-        # stores XY of mouse events
-        mouse_x = 0
-        mouse_y = 0
 
         # set up data structures and lists
         mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
-
-        # set background color
-        DISPLAYSURFACE.fill(BGCOLOR)
 
         # main game loop
         while restar == False:
