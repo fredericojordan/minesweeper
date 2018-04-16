@@ -138,7 +138,7 @@ class Minesweeper():
                             draw_text(str(i), self._BASICFONT, NUMBER_COLORS[i], self._display_surface, center_x, center_y)
                             
     def draw_covers(self):
-        """Uses revealedBox FIELDWIDTH x FIELDHEIGHT data structure to determine whether to draw box covering mine/number
+        """Uses revealed_boxes FIELDWIDTH x FIELDHEIGHT data structure to determine whether to draw box covering mine/number
         Draws red cover instead of gray cover over marked mines
         """
         for box_x in range(FIELDWIDTH):
@@ -206,9 +206,36 @@ class Minesweeper():
     
 #         debug_field(info, 'info')
         return info
+    
+    def mark_box(self, x, y):
+        """Toggles if mine box is marked"""
+        if self.marked_mines[x][y]:
+            self.marked_mines[x][y] = True
+        else:
+            self.marked_mines[x][y] = False
+    
+    def reveal_box(self, x, y):
+        """Reveals box clicked"""
+        has_game_ended = False
+        self.revealed_boxes[x][y] = True
+                                               
+        if self.is_game_won():
+            print('WIN!!!')
+            has_game_ended = True
+
+        # when 0 is revealed, show relevant boxes
+        if self.mine_field[x][y] == 0:
+            self.reveal_empty_squares(x, y)
+
+        # when mine is revealed, show mines
+        if self.mine_field[x][y] == MINE:
+            self.show_mines()
+            has_game_ended = True
+        
+        return has_game_ended
 
     def reveal_empty_squares(self, box_x, box_y, zero_list_xy=[]):
-        """Modifies revealedBox data structure if chosen box_x & box_y is 0
+        """Modifies revealed_boxes data structure if chosen box_x & box_y is 0
         Shows all boxes using recursion
         """
         self.revealed_boxes[box_x][box_y] = True
@@ -238,7 +265,7 @@ class Minesweeper():
             self.revealed_boxes[box_x][box_y+1] = True
 
     def show_mines(self):     
-        """Modifies revealedBox data structure if chosen box_x & box_y is X"""
+        """Modifies revealed_boxes data structure if chosen box_x & box_y is X"""
         for i in range(FIELDWIDTH):
             for j in range(FIELDHEIGHT):
                 if self.mine_field[i][j] == MINE:
@@ -274,7 +301,7 @@ def main():
         # main game loop
         while not has_game_ended:
             # initialize input booleans
-            mine_clicked = False
+            mouse_clicked = False
             mine_flagged = False
 
             minesweeper.draw_field()
@@ -289,7 +316,7 @@ def main():
                 elif event.type == MOUSEBUTTONDOWN:
                     if event.button == LEFT_CLICK:
                         mouse_x, mouse_y = event.pos
-                        mine_clicked = True
+                        mouse_clicked = True
                     if event.button == RIGHT_CLICK:
                         mouse_x, mouse_y = event.pos
                         mine_flagged = True
@@ -300,16 +327,16 @@ def main():
             if AI_ENABLED:
                 info = minesweeper.available_info()
             
-                for s in AI_mark_squares(info):
-                    minesweeper.marked_mines[s[0]][s[1]] = True
+                for x, y in AI_mark_squares(info):
+                    minesweeper.marked_mines[x][y] = True
     
                 safe_squares = AI_reveal_safe_squares(info)
                 if safe_squares:
                     box_x, box_y = safe_squares[0][0], safe_squares[0][1]
-                    mine_clicked = True
+                    mouse_clicked = True
                 else:
                     box_x, box_y = (random.choice(range(FIELDWIDTH)), random.choice(range(FIELDHEIGHT)))
-                    mine_clicked = True
+                    mouse_clicked = True
 
             # mouse not over a box in field
             if (box_x, box_y) == (None, None):
@@ -317,7 +344,7 @@ def main():
                 # check if reset box is clicked
                 if minesweeper._RESET_RECT.collidepoint(mouse_x, mouse_y):
                     minesweeper.highlight_button(minesweeper._RESET_RECT)
-                    if mine_clicked: 
+                    if mouse_clicked: 
                         minesweeper.new_game()
 
             # mouse currently over box in field
@@ -326,31 +353,12 @@ def main():
                 if not minesweeper.revealed_boxes[box_x][box_y]: 
                     minesweeper.highlight_box(box_x, box_y)
 
-                    # mark mines
                     if mine_flagged:
-                        if minesweeper.marked_mines[box_x][box_y]:
-                            minesweeper.marked_mines[box_x][box_y] = True
-                        else:
-                            minesweeper.marked_mines[box_x][box_y] = False
+                        minesweeper.mark_box(box_x, box_y)
                         
-                    # reveal clicked boxes
-                    if mine_clicked:
-                        minesweeper.revealed_boxes[box_x][box_y] = True
-                                               
-                        if minesweeper.is_game_won():
-                            print('WIN!!!')
-                            has_game_ended = True
-                        
+                    if mouse_clicked:
+                        has_game_ended = minesweeper.reveal_box(box_x, box_y)
                         minesweeper._save_turn()
-
-                        # when 0 is revealed, show relevant boxes
-                        if minesweeper.mine_field[box_x][box_y] == 0:
-                            minesweeper.reveal_empty_squares(box_x, box_y)
-
-                        # when mine is revealed, show mines
-                        if minesweeper.mine_field[box_x][box_y] == MINE:
-                            minesweeper.show_mines()
-                            has_game_ended = True
                 
             # redraw screen, wait clock tick
             pygame.display.update()
@@ -374,10 +382,8 @@ def get_random_minefield():
     while mine_count < MINESTOTAL: 
         x = random.randint(0, FIELDWIDTH-1)
         y = random.randint(0, FIELDHEIGHT-1)
-        xy.append([x, y]) 
-        if xy.count([x, y]) > 1: 
-            xy.remove([x, y]) 
-        else: 
+        if [x, y] not in xy:
+            xy.append([x, y]) 
             field[x][y] = MINE 
             mine_count += 1
     
@@ -424,9 +430,7 @@ def place_numbers(field):
 
 
 def get_field_with_value(value):
-    """Returns FIELDWIDTH x FIELDHEIGHT data structure different from the field data structure
-    Each item in data structure is boolean (value) to show whether box at those fieldwidth & fieldheight coordinates should be revealed
-    """
+    """Returns FIELDWIDTH x FIELDHEIGHT data structure completely filled with VALUE"""
     revealed_boxes = []
     for _ in range(FIELDWIDTH):
         revealed_boxes.append([value] * FIELDHEIGHT)
