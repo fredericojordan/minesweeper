@@ -84,7 +84,10 @@ def main():
         mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
 
         # main game loop
+        choices = []
+
         while restar == False:
+            new_position = False
 
             # check for quit function
             checkForKeyPress()
@@ -130,7 +133,15 @@ def main():
                 
             # determine boxes at clicked areas
             #box_x, box_y = getBoxAtPixel(mouse_x, mouse_y)
-            box_x, box_y = (random.choice(range(FIELDWIDTH)),random.choice(range(FIELDHEIGHT)))
+            
+            while new_position == False:
+                choice = random.choice(range(FIELDWIDTH)),random.choice(range(FIELDHEIGHT))
+
+                if revealedBoxes[choice[0]][choice[1]] == False:
+                    choices.append(choice)
+                    new_position = True
+
+            box_x, box_y = (choice)
             mouseClicked = True
 
             # mouse not over a box in field
@@ -158,29 +169,40 @@ def main():
                     # mark mines
                     if spacePressed:
                         markedMines.append([box_x, box_y])
+
+                    turn = saveTurn(mineField, revealedBoxes, choice)
                         
                     # reveal clicked boxes
                     if mouseClicked:
                         revealedBoxes[box_x][box_y] = True
-                        turn = saveTurn(mineField, revealedBoxes)
-                        if turn[-1] > 70:
-                            print('WIN!!!')
-                            win = True
-                        database.append(turn)
-                        #print(database[play])      
-                        play += 1
 
                         # when 0 is revealed, show relevant boxes
                         if mineField[box_x][box_y] == '[0]':
                             showNumbers(revealedBoxes, mineField, box_x, box_y, zeroListXY)
 
+                        if mineField[box_x][box_y] != '[X]':
+                            
+                            database.append(turn)
+                            print(database[play])
+                            play += 1
+                        
+                        openboxes = 0
+                        for i in revealedBoxes:
+                        	openboxes += i.count(True)
+                        print(openboxes)
+                        if openboxes > 70:
+                            print('WIN!!!')
+                            win = True    
+
+
                         # when mine is revealed, show mines
                         if mineField[box_x][box_y] == '[X]':
+                            #print(saveTurn(mineField, revealedBoxes, choice))
+
                             showMines(revealedBoxes, mineField, box_x, box_y)
                             #gameOverAnimation(mineField, revealedBoxes, markedMines, 'LOSS')
                             mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
                             restar = True
-
             # check if player has won 
             if gameWon(revealedBoxes, mineField):
                 #gameOverAnimation(mineField, revealedBoxes, markedMines, 'WIN')
@@ -192,8 +214,9 @@ def main():
             FPSCLOCK.tick(FPS)
         
         tries +=1
-        print(tries)
-def saveTurn(mineField, revealedBoxes):
+        print('Jogo '+str(tries))
+
+def saveTurn(mineField, revealedBoxes, choice):
     
     turn = []
     for box_x in range(FIELDWIDTH):
@@ -206,12 +229,15 @@ def saveTurn(mineField, revealedBoxes):
                     col.append(100)
             else:
                 col.append(-1)
-        turn.append(col)
-    score = 0
-    for col in turn:
-        score += sum(i > -1 for i in col)
-    turn.append(score)
-    return(turn)
+        turn += (col)
+    # score = 0
+    # for col in turn:
+    #     score += sum(i > -1 for i in col)
+    # turn.append(score)
+    choicebox = FIELDHEIGHT*choice[0]+choice[1]
+    choicelist = [0 for i in range(FIELDHEIGHT*FIELDWIDTH)]
+    choicelist[choicebox] = 1
+    return(turn, choicelist)
     
 def blankField():
 
