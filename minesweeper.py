@@ -291,32 +291,10 @@ class Minesweeper:
         for x in range(FIELDWIDTH):
             for y in range(FIELDHEIGHT):
                 if not self.is_there_mine(field, x, y):
-                    count = 0
-                    if x != 0:
-                        if self.is_there_mine(field, x-1, y):
-                            count += 1
-                        if y != 0:
-                            if self.is_there_mine(field, x-1, y-1):
-                                count += 1
-                        if y != FIELDHEIGHT-1:
-                            if self.is_there_mine(field, x-1, y+1):
-                                count += 1
-                    if x != FIELDWIDTH-1:
-                        if self.is_there_mine(field, x+1, y):
-                            count += 1
-                        if y != 0:
-                            if self.is_there_mine(field, x+1, y-1):
-                                count += 1
-                        if y != FIELDHEIGHT-1:
-                            if self.is_there_mine(field, x+1, y+1):
-                                count += 1
-                    if y != 0:
-                        if self.is_there_mine(field, x, y-1):
-                            count += 1
-                    if y != FIELDHEIGHT-1:
-                        if self.is_there_mine(field, x, y+1):
-                            count += 1
-                    field[x][y] = count
+                    field[x][y] = [
+                        field[neighbour_x][neighbour_y]
+                        for neighbour_x, neighbour_y in get_neighbour_squares([x, y])
+                    ].count(MINE)
 
     def get_random_minefield(self):
         """Places mines in FIELDWIDTH x FIELDHEIGHT data structure"""
