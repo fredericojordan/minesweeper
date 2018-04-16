@@ -1,27 +1,33 @@
 import random, pygame, sys
 from pygame.locals import *
 
-# set constants
+# AI
+AI_ENABLED = False
+
+# GAME
+FIELDWIDTH = 9
+FIELDHEIGHT = 9
+MINESTOTAL = 10
+
+# UI
 FPS = 30
 WINDOWWIDTH = 400
 WINDOWHEIGHT = 490
 BOXSIZE = 30
 GAPSIZE = 5
-FIELDWIDTH = 9
-FIELDHEIGHT = 9
 XMARGIN = int((WINDOWWIDTH-(FIELDWIDTH*(BOXSIZE+GAPSIZE)))/2)
 YMARGIN = XMARGIN
-MINESTOTAL = 10
 
+# INPUT
 LEFT_CLICK = 1
 RIGHT_CLICK = 3
 
 # assertions
 assert MINESTOTAL < FIELDHEIGHT*FIELDWIDTH, 'More mines than boxes'
 assert BOXSIZE^2 * (FIELDHEIGHT*FIELDWIDTH) < WINDOWHEIGHT*WINDOWWIDTH, 'Boxes will not fit on screen'
-assert BOXSIZE/2 > 5, 'Bounding errors when drawing rectangle, cannot use half-5 in drawMinesNumbers'
+assert BOXSIZE/2 > 5, 'Bounding errors when drawing rectangle, cannot use half-5 in draw_mines_numbers'
 
-# assign colors 
+# COLORS
 LIGHTGRAY = (225, 225, 225)
 DARKGRAY = (160, 160, 160)
 WHITE = (255, 255, 255)
@@ -47,36 +53,49 @@ MINEMARK_COV = RED
 FONTTYPE = 'Courier New'
 FONTSIZE = 20
 
-def main():
-    play = 0
-    win = False
-    tries = 0
-    database = []
+
+def draw_text():
+    pass
+
+
+def setup():
+    pygame.init()
+    pygame.display.set_caption('Minesweeper')
     
     # initialize global variables & pygame module, set caption
     global FPSCLOCK, DISPLAYSURFACE, BASICFONT, RESET_SURF, RESET_RECT, SHOW_SURF, SHOW_RECT
-    pygame.init()
-    pygame.display.set_caption('Minesweeper')
+    
     FPSCLOCK = pygame.time.Clock()
     DISPLAYSURFACE = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
     BASICFONT = pygame.font.SysFont(FONTTYPE, FONTSIZE)
 
     # obtain reset & show objects and rects
-    RESET_SURF, RESET_RECT = drawButton('RESET', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-75)
-    SHOW_SURF, SHOW_RECT = drawButton('SHOW ALL', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-50)
+    RESET_SURF, RESET_RECT = draw_button('RESET', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-75)
+    SHOW_SURF, SHOW_RECT = draw_button('SHOW ALL', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-50)
     
     # set background color
     DISPLAYSURFACE.fill(BGCOLOR)
+
+
+def main():
+    tries = 0
+    database = []
+    
+    setup()
+    
     
     # stores XY of mouse events
     mouse_x = 0
     mouse_y = 0
     
-    while win == False:
+    while True:
         restar = False
 
         # set up data structures and lists
-        mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
+        mineField, zeroListXY, revealedBoxes, markedMines = game_setup()
+        
+        tries +=1
+        print(tries)
 
         # main game loop
         while restar == False:
@@ -91,8 +110,8 @@ def main():
             # draw field
             DISPLAYSURFACE.fill(BGCOLOR)
             pygame.draw.rect(DISPLAYSURFACE, FIELDCOLOR, (XMARGIN-5, YMARGIN-5, (BOXSIZE+GAPSIZE)*FIELDWIDTH+5, (BOXSIZE+GAPSIZE)*FIELDHEIGHT+5))
-            drawField()
-            drawMinesNumbers(mineField)        
+            draw_field()
+            draw_mines_numbers(mineField)        
 
             # event handling loop
             for event in pygame.event.get():
@@ -116,44 +135,45 @@ def main():
                         spacePressed = False
 
             # draw covers
-            drawCovers(revealedBoxes, markedMines)
+            draw_covers(revealedBoxes, markedMines)
   
             # determine boxes at clicked areas
-            #box_x, box_y = getBoxAtPixel(mouse_x, mouse_y)
+            box_x, box_y = get_box_at_pixel(mouse_x, mouse_y)
             
-            info = available_info(mineField, zeroListXY, revealedBoxes, markedMines)
+            if AI_ENABLED:
+                info = available_info(mineField, zeroListXY, revealedBoxes, markedMines)
             
-            for s in AI_mark_squares(info):
-                markedMines.append([s[0], s[1]])
-
-            safe_squares = AI_reveal_safe_squares(info)
-            if safe_squares:
-                box_x, box_y = safe_squares[0][0], safe_squares[0][1]
-            else:
-                box_x, box_y = (random.choice(range(FIELDWIDTH)),random.choice(range(FIELDHEIGHT)))
-            mouseClicked = True
+                for s in AI_mark_squares(info):
+                    markedMines.append([s[0], s[1]])
+    
+                safe_squares = AI_reveal_safe_squares(info)
+                if safe_squares:
+                    box_x, box_y = safe_squares[0][0], safe_squares[0][1]
+                else:
+                    box_x, box_y = (random.choice(range(FIELDWIDTH)),random.choice(range(FIELDHEIGHT)))
+                mouseClicked = True
 
             # mouse not over a box in field
             if (box_x, box_y) == (None, None):
 
                 # check if reset box is clicked
                 if RESET_RECT.collidepoint(mouse_x, mouse_y):
-                    highlightButton(RESET_RECT)
+                    highlight_button(RESET_RECT)
                     if mouseClicked: 
-                        mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
+                        mineField, zeroListXY, revealedBoxes, markedMines = game_setup()
 
                 # check if show box is clicked
                 if SHOW_RECT.collidepoint(mouse_x, mouse_y):
-                    highlightButton(SHOW_RECT)
+                    highlight_button(SHOW_RECT)
                     if mouseClicked:
-                        revealedBoxes = blankRevealedBoxData(True)
+                        revealedBoxes = blank_revealed_box_data(True)
 
             # mouse currently over box in field
             else:
 
                 # highlight unrevealed box
                 if not revealedBoxes[box_x][box_y]: 
-                    highlightBox(box_x, box_y)
+                    highlight_box(box_x, box_y)
 
                     # mark mines
                     if spacePressed:
@@ -162,43 +182,40 @@ def main():
                     # reveal clicked boxes
                     if mouseClicked:
                         revealedBoxes[box_x][box_y] = True
-                        turn = saveTurn(mineField, revealedBoxes)
-                        if turn[-1] > 70:
+                                               
+                        if game_won(revealedBoxes, mineField):
                             print('WIN!!!')
-                            win = True
+                        
+                        turn = _save_turn(mineField, revealedBoxes)
                         database.append(turn)
-                        #print(database[play])      
-                        play += 1
+#                         print(database[-1])
 
                         # when 0 is revealed, show relevant boxes
                         if mineField[box_x][box_y] == '[0]':
-                            showNumbers(revealedBoxes, mineField, box_x, box_y, zeroListXY)
+                            show_numbers(revealedBoxes, mineField, box_x, box_y, zeroListXY)
 
                         # when mine is revealed, show mines
                         if mineField[box_x][box_y] == '[X]':
-                            showMines(revealedBoxes, mineField, box_x, box_y)
+                            show_mines(revealedBoxes, mineField, box_x, box_y)
                             #gameOverAnimation(mineField, revealedBoxes, markedMines, 'LOSS')
-                            mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
+                            mineField, zeroListXY, revealedBoxes, markedMines = game_setup()
                             restar = True
 
             # check if player has won 
-            if gameWon(revealedBoxes, mineField):
+            if game_won(revealedBoxes, mineField):
                 #gameOverAnimation(mineField, revealedBoxes, markedMines, 'WIN')
-                mineField, zeroListXY, revealedBoxes, markedMines = gameSetup()
+                mineField, zeroListXY, revealedBoxes, markedMines = game_setup()
                 restar = True
                 
             # redraw screen, wait clock tick
             pygame.display.update()
             FPSCLOCK.tick(FPS)
-        
-        tries +=1
-        print(tries)
 
-def saveTurn(mineField, revealedBoxes):
-    
+
+def _save_turn(mineField, revealedBoxes):
     turn = []
     for box_x in range(FIELDWIDTH):
-        col =[]
+        col = []
         for box_y in range(FIELDHEIGHT):
             if revealedBoxes[box_x][box_y]:
                 try:
@@ -208,13 +225,18 @@ def saveTurn(mineField, revealedBoxes):
             else:
                 col.append(-1)
         turn.append(col)
+        
     score = 0
     for col in turn:
         score += sum(i > -1 for i in col)
-    turn.append(score)
-    return(turn)
+    
+    return {
+        "turn": turn,
+        "score": score,
+    }
 
-def blankField():
+
+def blank_field():
 
    # creates blank FIELDWIDTH x FIELDHEIGHT data structure
 
@@ -225,7 +247,8 @@ def blankField():
             field[x].append('[ ]')
     return field
 
-def placeMines(field): 
+
+def place_mines(field): 
 
     # places mines in FIELDWIDTH x FIELDHEIGHT data structure
     # requires blank field as input
@@ -242,48 +265,51 @@ def placeMines(field):
             field[x][y] = '[X]' 
             mineCount += 1
 
-def isThereMine(field, x, y): 
+
+def is_there_mine(field, x, y): 
 
     # checks if mine is located at specific box on field
 
     return field[x][y] == '[X]'  
 
-def placeNumbers(field): 
+
+def place_numbers(field): 
 
     # places numbers in FIELDWIDTH x FIELDHEIGHT data structure
     # requires field with mines as input
 
     for x in range(FIELDWIDTH):
         for y in range(FIELDHEIGHT):
-            if not isThereMine(field, x, y):
+            if not is_there_mine(field, x, y):
                 count = 0
                 if x != 0: 
-                    if isThereMine(field, x-1, y):
+                    if is_there_mine(field, x-1, y):
                         count += 1
                     if y != 0: 
-                        if isThereMine(field, x-1, y-1):
+                        if is_there_mine(field, x-1, y-1):
                             count += 1
                     if y != FIELDHEIGHT-1: 
-                        if isThereMine(field, x-1, y+1):
+                        if is_there_mine(field, x-1, y+1):
                             count += 1
                 if x != FIELDWIDTH-1: 
-                    if isThereMine(field, x+1, y):
+                    if is_there_mine(field, x+1, y):
                         count += 1
                     if y != 0: 
-                        if isThereMine(field, x+1, y-1):
+                        if is_there_mine(field, x+1, y-1):
                             count += 1
                     if y != FIELDHEIGHT-1: 
-                        if isThereMine(field, x+1, y+1):
+                        if is_there_mine(field, x+1, y+1):
                             count += 1
                 if y != 0: 
-                    if isThereMine(field, x, y-1):
+                    if is_there_mine(field, x, y-1):
                         count += 1
                 if y != FIELDHEIGHT-1: 
-                    if isThereMine(field, x, y+1):
+                    if is_there_mine(field, x, y+1):
                         count += 1
                 field[x][y] = '[%s]' %(count)
 
-def blankRevealedBoxData(val):
+
+def blank_revealed_box_data(val):
 
     # returns FIELDWIDTH x FIELDHEIGHT data structure different from the field data structure
     # each item in data structure is boolean (val) to show whether box at those fieldwidth & fieldheight coordinates should be revealed
@@ -293,32 +319,35 @@ def blankRevealedBoxData(val):
         revealedBoxes.append([val] * FIELDHEIGHT)
     return revealedBoxes
 
-def gameSetup():
+
+def game_setup():
 
     # set up mine field data structure, list of all zeros for recursion, and revealed box boolean data structure
 
-    mineField = blankField()
-    placeMines(mineField)
-    placeNumbers(mineField)
+    mineField = blank_field()
+    place_mines(mineField)
+    place_numbers(mineField)
     zeroListXY = []
     markedMines = []
-    revealedBoxes = blankRevealedBoxData(False)
+    revealedBoxes = blank_revealed_box_data(False)
 
     return mineField, zeroListXY, revealedBoxes, markedMines
 
-def drawField():
+
+def draw_field():
 
     # draws field GUI and reset button
 
     for box_x in range(FIELDWIDTH):
         for box_y in range(FIELDHEIGHT):
-            left, top = getLeftTopXY(box_x, box_y)
+            left, top = get_left_top_xy(box_x, box_y)
             pygame.draw.rect(DISPLAYSURFACE, BOXCOLOR_REV, (left, top, BOXSIZE, BOXSIZE))
 
     DISPLAYSURFACE.blit(RESET_SURF, RESET_RECT)
     DISPLAYSURFACE.blit(SHOW_SURF, SHOW_RECT)
 
-def drawMinesNumbers(field):
+
+def draw_mines_numbers(field):
     
     # draws mines and numbers onto GUI
     # field should have mines and numbers
@@ -329,8 +358,8 @@ def drawMinesNumbers(field):
     
     for box_x in range(FIELDWIDTH):
         for box_y in range(FIELDHEIGHT):
-            left, top = getLeftTopXY(box_x, box_y)
-            center_x, center_y = getCenterXY(box_x, box_y)
+            left, top = get_left_top_xy(box_x, box_y)
+            center_x, center_y = get_center_xy(box_x, box_y)
             if field[box_x][box_y] == '[X]':
                 pygame.draw.circle(DISPLAYSURFACE, MINECOLOR, (left+half, top+half), quarter)
                 pygame.draw.circle(DISPLAYSURFACE, WHITE, (left+half, top+half), eighth)
@@ -345,21 +374,23 @@ def drawMinesNumbers(field):
                             textColor = TEXTCOLOR_1
                         else:
                             textColor = TEXTCOLOR_2
-                        drawText(str(i), BASICFONT, textColor, DISPLAYSURFACE, center_x, center_y)
+                        draw_text(str(i), BASICFONT, textColor, DISPLAYSURFACE, center_x, center_y)
 
-def showNumbers(revealedBoxes, mineField, box_x, box_y, zeroListXY):
+
+def show_numbers(revealedBoxes, mineField, box_x, box_y, zeroListXY):
 
     # modifies revealedBox data strucure if chosen box_x & box_y is [0] 
     # show all boxes using recursion
     
     revealedBoxes[box_x][box_y] = True
-    revealAdjacentBoxes(revealedBoxes, box_x, box_y)
-    for i,j in getAdjacentBoxesXY(mineField, box_x, box_y):
+    reveal_adjacent_boxes(revealedBoxes, box_x, box_y)
+    for i,j in get_adjacent_boxes_xy(mineField, box_x, box_y):
         if mineField[i][j] == '[0]' and [i,j] not in zeroListXY:
             zeroListXY.append([i,j])
-            showNumbers(revealedBoxes, mineField, i, j, zeroListXY)
+            show_numbers(revealedBoxes, mineField, i, j, zeroListXY)
 
-def showMines(revealedBoxes, mineField, box_x, box_y): 
+
+def show_mines(revealedBoxes, mineField, box_x, box_y): 
 
     # modifies revealedBox data strucure if chosen box_x & box_y is [X] 
 
@@ -368,7 +399,8 @@ def showMines(revealedBoxes, mineField, box_x, box_y):
             if mineField[i][j] == '[X]':
                 revealedBoxes[i][j] = True
     
-def revealAdjacentBoxes(revealedBoxes, box_x, box_y):
+
+def reveal_adjacent_boxes(revealedBoxes, box_x, box_y):
 
     # modifies revealedBoxes data structure so that all adjacent boxes to (box_x, box_y) are set to True
 
@@ -388,8 +420,9 @@ def revealAdjacentBoxes(revealedBoxes, box_x, box_y):
         revealedBoxes[box_x][box_y-1] = True
     if box_y != FIELDHEIGHT-1: 
         revealedBoxes[box_x][box_y+1] = True
+        
 
-def getAdjacentBoxesXY(mineField, box_x, box_y):
+def get_adjacent_boxes_xy(mineField, box_x, box_y):
 
     # get box XY coordinates for all adjacent boxes to (box_x, box_y)
 
@@ -413,8 +446,9 @@ def getAdjacentBoxesXY(mineField, box_x, box_y):
         adjacentBoxesXY.append([box_x,box_y+1])
 
     return adjacentBoxesXY
-    
-def drawCovers(revealedBoxes, markedMines):
+
+
+def draw_covers(revealedBoxes, markedMines):
 
     # uses revealedBox FIELDWIDTH x FIELDHEIGHT data structure to determine whether to draw box covering mine/number
     # draw red cover instead of gray cover over marked mines
@@ -422,13 +456,14 @@ def drawCovers(revealedBoxes, markedMines):
     for box_x in range(FIELDWIDTH):
         for box_y in range(FIELDHEIGHT):
             if not revealedBoxes[box_x][box_y]:
-                left, top = getLeftTopXY(box_x, box_y)
+                left, top = get_left_top_xy(box_x, box_y)
                 if [box_x, box_y] in markedMines:
                     pygame.draw.rect(DISPLAYSURFACE, MINEMARK_COV, (left, top, BOXSIZE, BOXSIZE))
                 else:
                     pygame.draw.rect(DISPLAYSURFACE, BOXCOLOR_COV, (left, top, BOXSIZE, BOXSIZE))
 
-def drawText(text, font, color, surface, x, y):  
+
+def draw_text(text, font, color, surface, x, y):  
 
     # function to easily draw text and also return object & rect pair
 
@@ -438,9 +473,10 @@ def drawText(text, font, color, surface, x, y):
     textrect.centery = y
     surface.blit(textobj, textrect)
 
-def drawButton(text, color, bgcolor, center_x, center_y):
 
-    # similar to drawText but text has bg color and returns obj & rect
+def draw_button(text, color, bgcolor, center_x, center_y):
+
+    # similar to draw_text but text has bg color and returns obj & rect
 
     butSurf = BASICFONT.render(text, True, color, bgcolor)
     butRect = butSurf.get_rect()
@@ -449,7 +485,8 @@ def drawButton(text, color, bgcolor, center_x, center_y):
 
     return (butSurf, butRect)
 
-def getLeftTopXY(box_x, box_y):
+
+def get_left_top_xy(box_x, box_y):
 
     # get left & top coordinates for drawing mine boxes
 
@@ -457,7 +494,8 @@ def getLeftTopXY(box_x, box_y):
     top = YMARGIN + box_y*(BOXSIZE+GAPSIZE)
     return left, top
 
-def getCenterXY(box_x, box_y):
+
+def get_center_xy(box_x, box_y):
 
     # get center coordinates for drawing mine boxes
     
@@ -465,33 +503,37 @@ def getCenterXY(box_x, box_y):
     center_y = YMARGIN + BOXSIZE/2 + box_y*(BOXSIZE+GAPSIZE)
     return center_x, center_y
 
-def getBoxAtPixel(x, y):
+
+def get_box_at_pixel(x, y):
 
     # gets coordinates of box at mouse coordinates
     
     for box_x in range(FIELDWIDTH):
         for box_y in range(FIELDHEIGHT):
-            left, top = getLeftTopXY(box_x, box_y)
+            left, top = get_left_top_xy(box_x, box_y)
             boxRect = pygame.Rect(left, top, BOXSIZE, BOXSIZE)
             if boxRect.collidepoint(x, y):
                 return (box_x, box_y)
     return (None, None)
 
-def highlightBox(box_x, box_y):
+
+def highlight_box(box_x, box_y):
 
     # highlight box when mouse hovers over it
     
-    left, top = getLeftTopXY(box_x, box_y)
+    left, top = get_left_top_xy(box_x, box_y)
     pygame.draw.rect(DISPLAYSURFACE, HILITECOLOR, (left, top, BOXSIZE, BOXSIZE), 4)
 
-def highlightButton(butRect):
+
+def highlight_button(butRect):
 
     # highlight button when mouse hovers over it
 
     linewidth = 4
     pygame.draw.rect(DISPLAYSURFACE, HILITECOLOR, (butRect.left-linewidth, butRect.top-linewidth, butRect.width+2*linewidth, butRect.height+2*linewidth), linewidth)
 
-def gameWon(revealedBoxes, mineField):
+
+def game_won(revealedBoxes, mineField):
 
     # check if player has revealed all boxes
 
@@ -508,42 +550,14 @@ def gameWon(revealedBoxes, mineField):
     else:
         return False
 
-def gameOverAnimation(mineField, revealedBoxes, markedMines, result):
 
-    # makes background flash red (loss) or blue (win)
-
-    origSurf = DISPLAYSURFACE.copy()
-    flashSurf = pygame.Surface(DISPLAYSURFACE.get_size())
-    flashSurf = flashSurf.convert_alpha()
-    animationSpeed = 2000
-
-    if result == 'WIN':
-        r, g, b = BLUE
-    else:
-        r, g, b = RED
-
-    for i in range(1):
-        for start, end, step in ((0, 255, 1), (255, 0, -1)):
-            for alpha in range(start, end, animationSpeed*step): # animation loop
-                checkForKeyPress()
-                flashSurf.fill((r, g, b, alpha))
-                DISPLAYSURFACE.blit(origSurf, (0, 0))
-                DISPLAYSURFACE.blit(flashSurf, (0, 0))
-                pygame.draw.rect(DISPLAYSURFACE, FIELDCOLOR, (XMARGIN-5, YMARGIN-5, (BOXSIZE+GAPSIZE)*FIELDWIDTH+5, (BOXSIZE+GAPSIZE)*FIELDHEIGHT+5))
-                drawField()
-                drawMinesNumbers(mineField)
-                RESET_SURF, RESET_RECT = drawButton('RESET', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-75)
-                SHOW_SURF, SHOW_RECT = drawButton('SHOW ALL', TEXTCOLOR_3, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-50)
-                drawCovers(revealedBoxes, markedMines)
-                pygame.display.update()
-                FPSCLOCK.tick(FPS)
-  
 def terminate():
 
     # simple function to exit game
     
     pygame.quit()
     sys.exit()
+
 
 def checkForKeyPress():
 
@@ -558,6 +572,7 @@ def checkForKeyPress():
     if keyUpEvents[0].key == K_ESCAPE:
         terminate()
     return keyUpEvents[0].key
+
 
 def debug_board(board, title=None):
     if title:
