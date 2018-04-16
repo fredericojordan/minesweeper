@@ -78,7 +78,8 @@ MINE = 'X'
 MARKED = -2
 HIDDEN = -1
 
-class Minesweeper():
+
+class Minesweeper:
     
     def __init__(self):
         pygame.init()
@@ -92,13 +93,15 @@ class Minesweeper():
         self._RESET_SURF, self._RESET_RECT = self.draw_button('RESET', TEXTCOLOR, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-50)
         
         self.database = []
-        self.new_game()
+        self.mine_field, self.revealed_boxes, self.marked_mines = self.new_game()
         
     def new_game(self):
         """Set up mine field data structure, list of all zeros for recursion, and revealed box boolean data structure"""
-        self.mine_field = get_random_minefield()
-        self.revealed_boxes = get_field_with_value(False)
-        self.marked_mines = get_field_with_value(False)
+        self.mine_field = self.get_random_minefield()
+        self.revealed_boxes = self.get_field_with_value(False)
+        self.marked_mines = self.get_field_with_value(False)
+
+        return self.mine_field, self.revealed_boxes, self.marked_mines
         
     def draw_field(self):
         """Draws field GUI"""
@@ -154,7 +157,6 @@ class Minesweeper():
         """Highlight box when mouse hovers over it"""
         left, top = get_left_top_xy(box_x, box_y)
         pygame.draw.rect(self._display_surface, HILITECOLOR, (left, top, BOXSIZE, BOXSIZE), 4)
-    
     
     def highlight_button(self, butRect):
         """Highlight button when mouse hovers over it"""
@@ -273,12 +275,76 @@ class Minesweeper():
 
     def draw_button(self, text, color, bgcolor, center_x, center_y):
         """Similar to draw_text but text has bg color and returns obj & rect"""
-        butSurf = self._BASICFONT.render(text, True, color, bgcolor)
-        butRect = butSurf.get_rect()
-        butRect.centerx = center_x
-        butRect.centery = center_y
-    
-        return (butSurf, butRect)
+        but_surf = self._BASICFONT.render(text, True, color, bgcolor)
+        but_rect = but_surf.get_rect()
+        but_rect.centerx = center_x
+        but_rect.centery = center_y
+
+        return but_surf, but_rect
+
+    def is_there_mine(self, field, x, y):
+        """Checks if mine is located at specific box on field"""
+        return field[x][y] == MINE
+
+    def place_numbers(self, field):
+        """Places numbers in FIELDWIDTH x FIELDHEIGHT data structure"""
+        for x in range(FIELDWIDTH):
+            for y in range(FIELDHEIGHT):
+                if not self.is_there_mine(field, x, y):
+                    count = 0
+                    if x != 0:
+                        if self.is_there_mine(field, x-1, y):
+                            count += 1
+                        if y != 0:
+                            if self.is_there_mine(field, x-1, y-1):
+                                count += 1
+                        if y != FIELDHEIGHT-1:
+                            if self.is_there_mine(field, x-1, y+1):
+                                count += 1
+                    if x != FIELDWIDTH-1:
+                        if self.is_there_mine(field, x+1, y):
+                            count += 1
+                        if y != 0:
+                            if self.is_there_mine(field, x+1, y-1):
+                                count += 1
+                        if y != FIELDHEIGHT-1:
+                            if self.is_there_mine(field, x+1, y+1):
+                                count += 1
+                    if y != 0:
+                        if self.is_there_mine(field, x, y-1):
+                            count += 1
+                    if y != FIELDHEIGHT-1:
+                        if self.is_there_mine(field, x, y+1):
+                            count += 1
+                    field[x][y] = count
+
+    def get_random_minefield(self):
+        """Places mines in FIELDWIDTH x FIELDHEIGHT data structure"""
+        field = self.get_field_with_value(0)
+        mine_count = 0
+        xy = []
+        while mine_count < MINESTOTAL:
+            x = random.randint(0, FIELDWIDTH - 1)
+            y = random.randint(0, FIELDHEIGHT - 1)
+            if [x, y] not in xy:
+                xy.append([x, y])
+                field[x][y] = MINE
+                mine_count += 1
+
+        self.place_numbers(field)
+        return field
+
+    def get_field_with_value(self, value):
+        """Returns FIELDWIDTH x FIELDHEIGHT data structure completely filled with VALUE"""
+        revealed_boxes = []
+        for _ in range(FIELDWIDTH):
+            revealed_boxes.append([value] * FIELDHEIGHT)
+        return revealed_boxes
+
+    def terminate(self):
+        """Simple function to exit game"""
+        pygame.quit()
+        sys.exit()
 
 
 def main():
@@ -310,7 +376,7 @@ def main():
             for event in pygame.event.get():
                 
                 if event.type == QUIT or (event.type == KEYDOWN and (event.key == K_ESCAPE or event.key == K_q)):
-                    terminate()
+                    minesweeper.terminate()
                 elif event.type == MOUSEMOTION:
                     mouse_x, mouse_y = event.pos
                 elif event.type == MOUSEBUTTONDOWN:
@@ -365,79 +431,7 @@ def main():
             minesweeper.clock.tick(FPS)
 
 
-def blank_field():
-    """Creates blank FIELDWIDTH x FIELDHEIGHT data structure"""
-    field = []
-    for _ in range(FIELDWIDTH):
-        field.append([0 for _ in range(FIELDHEIGHT)]) 
-            
-    return field
-
-
-def get_random_minefield(): 
-    """Places mines in FIELDWIDTH x FIELDHEIGHT data structure"""
-    field = blank_field()
-    mine_count = 0
-    xy = [] 
-    while mine_count < MINESTOTAL: 
-        x = random.randint(0, FIELDWIDTH-1)
-        y = random.randint(0, FIELDHEIGHT-1)
-        if [x, y] not in xy:
-            xy.append([x, y]) 
-            field[x][y] = MINE 
-            mine_count += 1
-    
-    place_numbers(field)
-    return field
-
-
-def is_there_mine(field, x, y): 
-    """Checks if mine is located at specific box on field"""
-    return field[x][y] == MINE
-
-
-def place_numbers(field): 
-    """Places numbers in FIELDWIDTH x FIELDHEIGHT data structure"""
-    for x in range(FIELDWIDTH):
-        for y in range(FIELDHEIGHT):
-            if not is_there_mine(field, x, y):
-                count = 0
-                if x != 0: 
-                    if is_there_mine(field, x-1, y):
-                        count += 1
-                    if y != 0: 
-                        if is_there_mine(field, x-1, y-1):
-                            count += 1
-                    if y != FIELDHEIGHT-1: 
-                        if is_there_mine(field, x-1, y+1):
-                            count += 1
-                if x != FIELDWIDTH-1: 
-                    if is_there_mine(field, x+1, y):
-                        count += 1
-                    if y != 0: 
-                        if is_there_mine(field, x+1, y-1):
-                            count += 1
-                    if y != FIELDHEIGHT-1: 
-                        if is_there_mine(field, x+1, y+1):
-                            count += 1
-                if y != 0: 
-                    if is_there_mine(field, x, y-1):
-                        count += 1
-                if y != FIELDHEIGHT-1: 
-                    if is_there_mine(field, x, y+1):
-                        count += 1
-                field[x][y] = count
-
-
-def get_field_with_value(value):
-    """Returns FIELDWIDTH x FIELDHEIGHT data structure completely filled with VALUE"""
-    revealed_boxes = []
-    for _ in range(FIELDWIDTH):
-        revealed_boxes.append([value] * FIELDHEIGHT)
-    return revealed_boxes
-
-
-def draw_text(text, font, color, surface, x, y):  
+def draw_text(text, font, color, surface, x, y):
     """Function to easily draw text and also return object & rect pair"""
     textobj = font.render(text, True, color)
     textrect = textobj.get_rect()
@@ -469,12 +463,6 @@ def get_box_at_pixel(x, y):
             if boxRect.collidepoint(x, y):
                 return (box_x, box_y)
     return (None, None)
-
-
-def terminate():
-    """Simple function to exit game"""
-    pygame.quit()
-    sys.exit()
 
 
 def debug_field(board, title=None):
