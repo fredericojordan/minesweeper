@@ -422,15 +422,18 @@ class Minesweeper:
 
         return flagged_squares
 
-    def get_AI_safe_squares(self, available_info):
+    def get_AI_safe_squares(self, available_info, guess=False):
         """Returns list of squares that are sure to NOT contain mines"""
         safe_squares = []
 
-        for x in range(len(available_info)):
-            for y in range(len(available_info[x])):
+        for x in range(FIELDWIDTH):
+            for y in range(FIELDHEIGHT):
                 flagged = self.get_flagged_neighbours([x, y], available_info)
                 if available_info[x][y] == len(flagged):
                     safe_squares.extend(self.get_uncertain_neighbours([x, y], available_info))
+
+        if not safe_squares and guess:
+            safe_squares.append([random.choice(range(FIELDWIDTH)), random.choice(range(FIELDHEIGHT))])
 
         return safe_squares
 
@@ -438,9 +441,7 @@ class Minesweeper:
         """Returns both the safe squares and the flagged squares"""
         # TODO: Apply flagged squares to game state before calculating safe squares
         flagged_squares = self.get_AI_flagged_squares(info)
-        # self.debug_field(flagged_squares, 'flag')
-        safe_squares = self.get_AI_safe_squares(info)
-        # self.debug_field(safe_squares, 'safe')
+        safe_squares = self.get_AI_safe_squares(info, guess=True)
         return safe_squares, flagged_squares
 
 
