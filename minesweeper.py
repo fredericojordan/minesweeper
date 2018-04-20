@@ -1,3 +1,4 @@
+import os
 import random
 import sys
 
@@ -5,32 +6,30 @@ import pygame
 from pygame.locals import *
 
 # AI
-# AI_ENABLED = False
 AI_ENABLED = True
 
-# BEGINNER
-FIELDWIDTH = 8
-FIELDHEIGHT = 8
-MINESTOTAL = 10
+# # BEGINNER
+# FIELDWIDTH = 8
+# FIELDHEIGHT = 8
+# MINESTOTAL = 10
 #  
 # # INTERMEDIATE
 # FIELDWIDTH = 16
 # FIELDHEIGHT = 16
 # MINESTOTAL = 40
 # 
-# # EXPERT
-# FIELDWIDTH = 24
-# FIELDHEIGHT = 24
-# MINESTOTAL = 99
+# EXPERT
+FIELDWIDTH = 24
+FIELDHEIGHT = 24
+MINESTOTAL = 99
 
 # UI
 FPS = 30
 BOXSIZE = 30
-GAPSIZE = 5
-WINDOWWIDTH = FIELDWIDTH*(BOXSIZE+GAPSIZE)+85
-WINDOWHEIGHT = FIELDWIDTH*(BOXSIZE+GAPSIZE)+135
-XMARGIN = int((WINDOWWIDTH-(FIELDWIDTH*(BOXSIZE+GAPSIZE)))/2)
-YMARGIN = XMARGIN
+WINDOWWIDTH = FIELDWIDTH*BOXSIZE+85
+WINDOWHEIGHT = FIELDWIDTH*BOXSIZE+135
+XMARGIN = int((WINDOWWIDTH-(FIELDWIDTH*BOXSIZE))/2)
+YMARGIN = XMARGIN+50
 
 # INPUT
 LEFT_CLICK = 1
@@ -46,30 +45,11 @@ LIGHTGRAY = (225, 225, 225)
 DARKGRAY = (160, 160, 160)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
-RED = (255, 0, 0)
-BLUE = (0, 0, 255)
-GREEN = (0, 128, 0)
 
-BGCOLOR = WHITE
-FIELDCOLOR = BLACK
-BOXCOLOR_COV = DARKGRAY  # covered box color
-BOXCOLOR_REV = LIGHTGRAY  # revealed box color
-MINECOLOR = BLACK
+BGCOLOR = LIGHTGRAY
 TEXTCOLOR = BLACK
-HILITECOLOR = GREEN
+HIGHLIGHTCOLOR = DARKGRAY
 RESETBGCOLOR = LIGHTGRAY
-MINEMARK_COV = RED
-NUMBER_COLORS = [
-    (  0,   0,   0),  # 0
-    (  0,   0, 255),  # 1
-    (  0, 127,   0),  # 2
-    (255,   0,   0),  # 3
-    (  0,   0, 127),  # 4
-    (127,   0,   0),  # 5
-    (  0, 127, 127),  # 6
-    (  0,   0,   0),  # 7
-    (127, 127, 127),  # 8
-]
 
 # set up font 
 FONTTYPE = 'Courier New'
@@ -88,11 +68,26 @@ class Minesweeper:
         pygame.display.set_caption('Minesweeper')
         
         self.clock = pygame.time.Clock()
+        
+        # load GUI
         self._display_surface = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
         self._BASICFONT = pygame.font.SysFont(FONTTYPE, FONTSIZE)
-    
-        # obtain reset surface and rect
-        self._RESET_SURF, self._RESET_RECT = self.draw_button('RESET', TEXTCOLOR, RESETBGCOLOR, WINDOWWIDTH/2, WINDOWHEIGHT-50)
+        self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH/2, 50)
+#         self._RESET_SURF, self._RESET_RECT = self.draw_button('RESET', TEXTCOLOR, RESETBGCOLOR, WINDOWWIDTH/2, 50)
+        self._images = {    
+            '0': pygame.transform.scale(pygame.image.load(os.path.join('media', '0.png')), (BOXSIZE, BOXSIZE)),
+            '1': pygame.transform.scale(pygame.image.load(os.path.join('media', '1.png')), (BOXSIZE, BOXSIZE)),
+            '2': pygame.transform.scale(pygame.image.load(os.path.join('media', '2.png')), (BOXSIZE, BOXSIZE)),
+            '3': pygame.transform.scale(pygame.image.load(os.path.join('media', '3.png')), (BOXSIZE, BOXSIZE)),
+            '4': pygame.transform.scale(pygame.image.load(os.path.join('media', '4.png')), (BOXSIZE, BOXSIZE)),
+            '5': pygame.transform.scale(pygame.image.load(os.path.join('media', '5.png')), (BOXSIZE, BOXSIZE)),
+            '6': pygame.transform.scale(pygame.image.load(os.path.join('media', '6.png')), (BOXSIZE, BOXSIZE)),
+            '7': pygame.transform.scale(pygame.image.load(os.path.join('media', '7.png')), (BOXSIZE, BOXSIZE)),
+            '8': pygame.transform.scale(pygame.image.load(os.path.join('media', '8.png')), (BOXSIZE, BOXSIZE)),
+            'hidden': pygame.transform.scale(pygame.image.load(os.path.join('media', 'hidden.png')), (BOXSIZE, BOXSIZE)),
+            'flag': pygame.transform.scale(pygame.image.load(os.path.join('media', 'flag.png')), (BOXSIZE, BOXSIZE)),
+            'mine': pygame.transform.scale(pygame.image.load(os.path.join('media', 'mine.png')), (BOXSIZE, BOXSIZE)),
+        }
         
         self.database = []
         self.mine_field, self.revealed_boxes, self.flagged_mines = self.new_game()
@@ -104,66 +99,38 @@ class Minesweeper:
         self.flagged_mines = self.get_field_with_value(False)
 
         return self.mine_field, self.revealed_boxes, self.flagged_mines
+    
+    def get_image(self, box_x, box_y):
+        if self.flagged_mines[box_x][box_y]:
+            return self._images.get('flag')
+        if self.revealed_boxes[box_x][box_y]:
+            if self.mine_field[box_x][box_y] == MINE:
+                return self._images.get('mine')
+            else:
+                return self._images.get(str(self.mine_field[box_x][box_y]))
+        else:
+            return self._images.get('hidden')
         
     def draw_field(self):
         """Draws field GUI"""
         self._display_surface.fill(BGCOLOR)
-        pygame.draw.rect(self._display_surface, FIELDCOLOR, (XMARGIN-5, YMARGIN-5, (BOXSIZE+GAPSIZE)*FIELDWIDTH+5, (BOXSIZE+GAPSIZE)*FIELDHEIGHT+5))
     
         for box_x in range(FIELDWIDTH):
             for box_y in range(FIELDHEIGHT):
                 left, top = self.get_left_top_xy(box_x, box_y)
-                pygame.draw.rect(self._display_surface, BOXCOLOR_REV, (left, top, BOXSIZE, BOXSIZE))
+                self._display_surface.blit(self.get_image(box_x, box_y), (left,top))
     
         self._display_surface.blit(self._RESET_SURF, self._RESET_RECT)
-        
-        self.draw_mines_numbers()
-        self.draw_covers()
-
-    def draw_mines_numbers(self):
-        """Draws mines and numbers onto GUI"""
-        half = int(BOXSIZE*0.5) 
-        quarter = int(BOXSIZE*0.25)
-        eighth = int(BOXSIZE*0.125)
-        
-        for box_x in range(FIELDWIDTH):
-            for box_y in range(FIELDHEIGHT):
-                left, top = self.get_left_top_xy(box_x, box_y)
-                center_x, center_y = self.get_center_xy(box_x, box_y)
-                if self.mine_field[box_x][box_y] == MINE:
-                    pygame.draw.circle(self._display_surface, MINECOLOR, (left+half, top+half), quarter)
-                    pygame.draw.circle(self._display_surface, WHITE, (left+half, top+half), eighth)
-                    pygame.draw.line(self._display_surface, MINECOLOR, (left+eighth, top+half), (left+half+quarter+eighth, top+half))
-                    pygame.draw.line(self._display_surface, MINECOLOR, (left+half, top+eighth), (left+half, top+half+quarter+eighth))
-                    pygame.draw.line(self._display_surface, MINECOLOR, (left+quarter, top+quarter), (left+half+quarter, top+half+quarter))
-                    pygame.draw.line(self._display_surface, MINECOLOR, (left+quarter, top+half+quarter), (left+half+quarter, top+quarter))
-                else: 
-                    for i in range(1,9):
-                        if self.mine_field[box_x][box_y] == i:
-                            self.draw_text(str(i), self._BASICFONT, NUMBER_COLORS[i], self._display_surface, center_x, center_y)
-                            
-    def draw_covers(self):
-        """Uses revealed_boxes FIELDWIDTH x FIELDHEIGHT data structure to determine whether to draw box covering mine/number
-        Draws red cover instead of gray cover over flagged mines
-        """
-        for box_x in range(FIELDWIDTH):
-            for box_y in range(FIELDHEIGHT):
-                if not self.revealed_boxes[box_x][box_y]:
-                    left, top = self.get_left_top_xy(box_x, box_y)
-                    if self.flagged_mines[box_x][box_y]:
-                        pygame.draw.rect(self._display_surface, MINEMARK_COV, (left, top, BOXSIZE, BOXSIZE))
-                    else:
-                        pygame.draw.rect(self._display_surface, BOXCOLOR_COV, (left, top, BOXSIZE, BOXSIZE))
                         
     def highlight_box(self, box_x, box_y):
         """Highlight box when mouse hovers over it"""
         left, top = self.get_left_top_xy(box_x, box_y)
-        pygame.draw.rect(self._display_surface, HILITECOLOR, (left, top, BOXSIZE, BOXSIZE), 4)
+        pygame.draw.rect(self._display_surface, HIGHLIGHTCOLOR, (left, top, BOXSIZE, BOXSIZE), 4)
     
     def highlight_button(self, butRect):
         """Highlight button when mouse hovers over it"""
         linewidth = 4
-        pygame.draw.rect(self._display_surface, HILITECOLOR, (butRect.left-linewidth, butRect.top-linewidth, butRect.width+2*linewidth, butRect.height+2*linewidth), linewidth)
+        pygame.draw.rect(self._display_surface, HIGHLIGHTCOLOR, (butRect.left-linewidth, butRect.top-linewidth, butRect.width+2*linewidth, butRect.height+2*linewidth), linewidth)
 
     def is_game_won(self):
         """Checks if player has revealed all boxes"""
@@ -213,7 +180,7 @@ class Minesweeper:
     
     def toggle_flag_box(self, x, y):
         """Toggles if mine box is flagged"""
-        if not self.flagged_mines[x][y]:
+        if not self.flagged_mines[x][y] and not self.revealed_boxes[x][y]:
             self.flagged_mines[x][y] = True
         else:
             self.flagged_mines[x][y] = False
@@ -283,6 +250,14 @@ class Minesweeper:
         but_rect.centery = center_y
 
         return but_surf, but_rect
+    
+    def draw_smiley(self, center_x, center_y):
+        surface = pygame.image.load(os.path.join('media', 'smiley.png'))
+        surface = pygame.transform.scale(surface, (30, 30))
+        rect = surface.get_rect()
+        rect.centerx = center_x
+        rect.centery = center_y
+        return surface, rect
 
     def is_there_mine(self, field, x, y):
         """Checks if mine is located at specific box on field"""
@@ -336,14 +311,14 @@ class Minesweeper:
 
     def get_left_top_xy(self, box_x, box_y):
         """Get left & top coordinates for drawing mine boxes"""
-        left = XMARGIN + box_x * (BOXSIZE + GAPSIZE)
-        top = YMARGIN + box_y * (BOXSIZE + GAPSIZE)
+        left = XMARGIN + box_x*BOXSIZE
+        top = YMARGIN + box_y*BOXSIZE
         return left, top
 
     def get_center_xy(self, box_x, box_y):
         """Get center coordinates for drawing mine boxes"""
-        center_x = XMARGIN + BOXSIZE / 2 + box_x * (BOXSIZE + GAPSIZE)
-        center_y = YMARGIN + BOXSIZE / 2 + box_y * (BOXSIZE + GAPSIZE)
+        center_x = XMARGIN + BOXSIZE / 2 + box_x*BOXSIZE
+        center_y = YMARGIN + BOXSIZE / 2 + box_y*BOXSIZE
         return center_x, center_y
 
     def get_box_at_pixel(self, x, y):
