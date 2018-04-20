@@ -1,3 +1,4 @@
+import json
 import os
 import random
 import sys
@@ -14,6 +15,10 @@ INTERMEDIATE = (16, 16, 40)
 EXPERT = (24, 24, 99)
 
 FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = EXPERT
+
+# PERSISTENT DATA
+LOG_TO_FILE = False
+DATABASE_FILENAME = 'data.txt'
 
 # UI
 FPS = 30
@@ -81,7 +86,7 @@ class Minesweeper:
             'mine': pygame.transform.scale(pygame.image.load(os.path.join('media', 'mine.png')), (BOXSIZE, BOXSIZE)),
         }
 
-        self.database = []
+        self.database = open(DATABASE_FILENAME, 'a')
         self.mine_field, self.revealed_boxes, self.flagged_mines = self.new_game()
 
     def new_game(self):
@@ -141,19 +146,23 @@ class Minesweeper:
         else:
             return False
 
-    def _save_turn(self):
+    def save_turn(self, selected_square):
         info = self.available_info()
 
-        score = 0
-        for col in info:
-            score += sum(i != MINE and i != -1 for i in col)
+        if self.mine_field[selected_square[0]][selected_square[1]] == MINE:
+            score = 0
+        else:
+            total_safe_squares = (FIELDHEIGHT*FIELDWIDTH) - MINESTOTAL
+            safe_count = sum(column.count(True) for column in self.revealed_boxes)
+            score = float(safe_count)/float(total_safe_squares)
 
-        self.database.append({
+        database_entry = json.dumps({
             "turn": info,
+            "move": selected_square,
             "score": score,
         })
-
-    #         print(self.database[-1])
+        self.database.write(database_entry)
+        self.database.write('\n')
 
     def available_info(self):
         info = []
@@ -293,6 +302,7 @@ class Minesweeper:
 
     def terminate(self):
         """Simple function to exit game"""
+        self.database.close()
         pygame.quit()
         sys.exit()
 
@@ -472,6 +482,8 @@ def main():
 
             for x, y in safe_squares:
                 has_game_ended = minesweeper.reveal_box(x, y)
+                if LOG_TO_FILE:
+                    minesweeper.save_turn([x, y])
                 if has_game_ended:
                     break
 
