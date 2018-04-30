@@ -6,14 +6,14 @@ import pygame
 from pygame.locals import *
 
 # AI
-AI_ENABLED = False
+AI_TYPE = "none"
 
 # DIFFICULTY
 BEGINNER = (9, 9, 10)
 INTERMEDIATE = (16, 16, 40)
 EXPERT = (30, 16, 99)
 
-FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = EXPERT
+FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = BEGINNER
 
 # UI
 FPS = 30
@@ -64,7 +64,6 @@ class Minesweeper:
         # load GUI
         self._display_surface = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
         self._BASICFONT = pygame.font.SysFont(FONTTYPE, FONTSIZE)
-        self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH/2, 50)
 #         self._RESET_SURF, self._RESET_RECT = self.draw_button('RESET', TEXTCOLOR, RESETBGCOLOR, WINDOWWIDTH/2, 50)
         self._images = {    
             '0': pygame.transform.scale(pygame.image.load(os.path.join('media', '0.png')), (BOXSIZE, BOXSIZE)),
@@ -86,6 +85,8 @@ class Minesweeper:
         
     def new_game(self):
         """Set up mine field data structure, list of all zeros for recursion, and revealed box boolean data structure"""
+        self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH/2, 50, 'smiley.png')
+        
         self.mine_field = self.get_random_minefield()
         self.revealed_boxes = self.get_field_with_value(False)
         self.flagged_mines = self.get_field_with_value(False)
@@ -179,12 +180,13 @@ class Minesweeper:
     
     def reveal_box(self, x, y):
         """Reveals box clicked"""
-        has_game_ended = False
+        #has_game_ended = False
         self.revealed_boxes[x][y] = True
                                                
         if self.is_game_won():
             print('WIN!!!')
-            has_game_ended = True
+            self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH/2, 50, 'win.png')
+            #has_game_ended = True
 
         # when 0 is revealed, show relevant boxes
         if self.mine_field[x][y] == 0:
@@ -193,10 +195,10 @@ class Minesweeper:
         # when mine is revealed, show mines
         if self.mine_field[x][y] == MINE:
             self.show_mines()
-            has_game_ended = True
-            print('MINE')
+            self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH/2, 50, 'lose.png')
+            #has_game_ended = True
         
-        return has_game_ended
+        #return has_game_ended
 
     def reveal_empty_squares(self, box_x, box_y): #, zero_list_xy=[]):
         """Modifies revealed_boxes data structure if chosen box_x & box_y is 0
@@ -252,9 +254,9 @@ class Minesweeper:
 
         return but_surf, but_rect
     
-    def draw_smiley(self, center_x, center_y):
-        surface = pygame.image.load(os.path.join('media', 'smiley.png'))
-        surface = pygame.transform.scale(surface, (30, 30))
+    def draw_smiley(self, center_x, center_y, filename):
+        surface = pygame.image.load(os.path.join('media', filename))
+        surface = pygame.transform.scale(surface, (50, 50))
         rect = surface.get_rect()
         rect.centerx = center_x
         rect.centery = center_y
@@ -448,8 +450,8 @@ def main():
             # Draw screen
             minesweeper.draw_field()
 
-            # Get AI input
-            if AI_ENABLED:
+            # Get Fred's AI input
+            if AI_TYPE == 'FRED':
                 info = minesweeper.available_info()
                 safe_squares, flagged_squares = minesweeper.get_AI_input(info)
 
@@ -460,6 +462,7 @@ def main():
                 elif event.type == MOUSEMOTION:
                     mouse_x, mouse_y = event.pos
                 elif event.type == MOUSEBUTTONDOWN:
+                    minesweeper._RESET_SURF, minesweeper._RESET_RECT = minesweeper.draw_smiley(WINDOWWIDTH/2, 50, 'check.png')
                     if event.button == LEFT_CLICK:
                         mouse_x, mouse_y = event.pos
                         mouse_clicked = True
@@ -478,8 +481,8 @@ def main():
 
             for x, y in safe_squares:
                 has_game_ended = minesweeper.reveal_box(x, y)
-                if has_game_ended:
-                    break
+                #if has_game_ended:
+                    #break
 
             # Check if reset box is clicked
             if minesweeper._RESET_RECT.collidepoint(mouse_x, mouse_y):
