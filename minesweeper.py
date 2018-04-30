@@ -6,12 +6,12 @@ import pygame
 from pygame.locals import *
 
 # AI
-AI_ENABLED = True
+AI_ENABLED = False
 
 # DIFFICULTY
-BEGINNER = (8, 8, 10)
+BEGINNER = (9, 9, 10)
 INTERMEDIATE = (16, 16, 40)
-EXPERT = (24, 24, 99)
+EXPERT = (30, 16, 99)
 
 FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = EXPERT
 
@@ -19,7 +19,7 @@ FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = EXPERT
 FPS = 30
 BOXSIZE = 30
 WINDOWWIDTH = FIELDWIDTH*BOXSIZE+85
-WINDOWHEIGHT = FIELDWIDTH*BOXSIZE+135
+WINDOWHEIGHT = FIELDHEIGHT*BOXSIZE+135
 XMARGIN = int((WINDOWWIDTH-(FIELDWIDTH*BOXSIZE))/2)
 YMARGIN = XMARGIN+50
 
@@ -194,38 +194,47 @@ class Minesweeper:
         if self.mine_field[x][y] == MINE:
             self.show_mines()
             has_game_ended = True
+            print('MINE')
         
         return has_game_ended
 
-    def reveal_empty_squares(self, box_x, box_y, zero_list_xy=[]):
+    def reveal_empty_squares(self, box_x, box_y): #, zero_list_xy=[]):
         """Modifies revealed_boxes data structure if chosen box_x & box_y is 0
         Shows all boxes using recursion
         """
         self.revealed_boxes[box_x][box_y] = True
-        self.reveal_adjacent_boxes(box_x, box_y)
-        for i, j in self.get_neighbour_squares([box_x, box_y]):
-            if self.mine_field[i][j] == 0 and [i,j] not in zero_list_xy:
-                zero_list_xy.append([i,j])
-                self.reveal_empty_squares(i, j, zero_list_xy)
                 
-    def reveal_adjacent_boxes(self, box_x, box_y):
-        """Modifies revealed_boxes data structure so that all adjacent boxes to (box_x, box_y) are set to True"""
-        if box_x != 0: 
-            self.revealed_boxes[box_x-1][box_y] = True
-            if box_y != 0: 
-                self.revealed_boxes[box_x-1][box_y-1] = True
-            if box_y != FIELDHEIGHT-1: 
-                self.revealed_boxes[box_x-1][box_y+1] = True
-        if box_x != FIELDWIDTH-1:
-            self.revealed_boxes[box_x+1][box_y] = True
-            if box_y != 0: 
-                self.revealed_boxes[box_x+1][box_y-1] = True
-            if box_y != FIELDHEIGHT-1: 
-                self.revealed_boxes[box_x+1][box_y+1] = True
-        if box_y != 0: 
-            self.revealed_boxes[box_x][box_y-1] = True
-        if box_y != FIELDHEIGHT-1: 
-            self.revealed_boxes[box_x][box_y+1] = True
+        if box_x > 0 and box_y > 0:
+            if self.revealed_boxes[box_x-1][box_y-1] == False:
+                self.reveal_box(box_x-1, box_y-1)
+            
+        if box_y > 0:
+            if self.revealed_boxes[box_x][box_y-1] == False:
+                self.reveal_box(box_x, box_y-1)
+            
+        if box_x < FIELDWIDTH-1 and box_y > 0:
+            if self.revealed_boxes[box_x+1][box_y-1] == False:
+                self.reveal_box(box_x+1, box_y-1)
+            
+        if box_x > 0:
+            if self.revealed_boxes[box_x-1][box_y] == False:
+                self.reveal_box(box_x-1, box_y)
+            
+        if box_x < FIELDWIDTH-1:
+            if self.revealed_boxes[box_x+1][box_y] == False:
+                self.reveal_box(box_x+1, box_y)
+            
+        if box_x > 0 and box_y < FIELDHEIGHT-1:
+            if self.revealed_boxes[box_x-1][box_y+1] == False:
+                self.reveal_box(box_x-1, box_y+1)
+            
+        if box_y < FIELDHEIGHT-1:
+            if self.revealed_boxes[box_x][box_y+1] == False:
+                self.reveal_box(box_x, box_y+1)
+            
+        if box_x < FIELDWIDTH-1 and box_y < FIELDHEIGHT-1:
+            if self.revealed_boxes[box_x+1][box_y+1] == False:
+                self.reveal_box(box_x+1, box_y+1)
 
     def show_mines(self):     
         """Modifies revealed_boxes data structure if chosen box_x & box_y is X"""
