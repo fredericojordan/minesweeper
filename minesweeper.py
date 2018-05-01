@@ -6,7 +6,10 @@ import pygame
 from pygame.locals import *
 
 # AI
-AI_TYPE = "none"
+#AI_TYPE = "FRED"
+#AI_TYPE = "RANDOM"
+#AI_TYPE = "ANN"
+AI_TYPE = "HUMAN"
 
 # DIFFICULTY
 BEGINNER = (9, 9, 10)
@@ -81,17 +84,17 @@ class Minesweeper:
         }
         
         self.database = []
-        self.mine_field, self.revealed_boxes, self.flagged_mines = self.new_game()
+        self.mine_field, self.revealed_boxes, self.flagged_mines = self.new_game() #, self.game_over
         
     def new_game(self):
         """Set up mine field data structure, list of all zeros for recursion, and revealed box boolean data structure"""
         self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH/2, 50, 'smiley.png')
-        
+        #self.game_over = False
         self.mine_field = self.get_random_minefield()
         self.revealed_boxes = self.get_field_with_value(False)
         self.flagged_mines = self.get_field_with_value(False)
 
-        return self.mine_field, self.revealed_boxes, self.flagged_mines
+        return self.mine_field, self.revealed_boxes, self.flagged_mines #, self.game_over
     
     def get_image(self, box_x, box_y):
         if self.flagged_mines[box_x][box_y]:
@@ -180,13 +183,15 @@ class Minesweeper:
     
     def reveal_box(self, x, y):
         """Reveals box clicked"""
-        #has_game_ended = False
+        self.game_over = False
         self.revealed_boxes[x][y] = True
                                                
         if self.is_game_won():
             print('WIN!!!')
             self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH/2, 50, 'win.png')
-            #has_game_ended = True
+            self.game_over = True
+            if AI_TYPE != 'HUMAN':
+                self.new_game() 
 
         # when 0 is revealed, show relevant boxes
         if self.mine_field[x][y] == 0:
@@ -196,9 +201,11 @@ class Minesweeper:
         if self.mine_field[x][y] == MINE:
             self.show_mines()
             self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH/2, 50, 'lose.png')
-            #has_game_ended = True
+            self.game_over = True
+            if AI_TYPE != 'HUMAN':
+                self.new_game() 
         
-        #return has_game_ended
+        return self.game_over
 
     def reveal_empty_squares(self, box_x, box_y): #, zero_list_xy=[]):
         """Modifies revealed_boxes data structure if chosen box_x & box_y is 0
@@ -434,11 +441,15 @@ def main():
     
     while True:
         has_game_ended = False
+        game_over = False
 
         minesweeper.new_game()
         
         tries += 1
         print(tries)
+
+        # For random training
+        chosen_squares = []
 
         # Main game loop
         while not has_game_ended:
@@ -446,6 +457,7 @@ def main():
             mouse_clicked = False
             safe_squares = []
             flagged_squares = []
+            new_position = False # For random training
 
             # Draw screen
             minesweeper.draw_field()
@@ -455,6 +467,15 @@ def main():
                 info = minesweeper.available_info()
                 safe_squares, flagged_squares = minesweeper.get_AI_input(info)
 
+            # Get random position
+            if AI_TYPE == 'RANDOM':
+                while not new_position:
+                    choice = [[random.choice(range(FIELDWIDTH)),random.choice(range(FIELDHEIGHT))]]
+                    if minesweeper.revealed_boxes[choice[0][0]][choice[0][1]] == False:
+                        chosen_squares.append(choice)
+                        new_position = True
+                safe_squares = choice
+
             # Get player input
             for event in pygame.event.get():
                 if event.type == QUIT or (event.type == KEYDOWN and (event.key == K_ESCAPE or event.key == K_q)):
@@ -462,7 +483,6 @@ def main():
                 elif event.type == MOUSEMOTION:
                     mouse_x, mouse_y = event.pos
                 elif event.type == MOUSEBUTTONDOWN:
-                    minesweeper._RESET_SURF, minesweeper._RESET_RECT = minesweeper.draw_smiley(WINDOWWIDTH/2, 50, 'check.png')
                     if event.button == LEFT_CLICK:
                         mouse_x, mouse_y = event.pos
                         mouse_clicked = True
@@ -476,19 +496,24 @@ def main():
                             flagged_squares = [(box_x, box_y)]
 
             # Apply game changes
-            for x, y in flagged_squares:
-                minesweeper.toggle_flag_box(x, y)
+            if AI_TYPE != 'HUMAN':
+                if game_over:
+                    has_game_ended = True
 
-            for x, y in safe_squares:
-                has_game_ended = minesweeper.reveal_box(x, y)
-                #if has_game_ended:
-                    #break
+            if not game_over:
+                for x, y in flagged_squares:
+                    minesweeper.toggle_flag_box(x, y)
+
+                for x, y in safe_squares:
+                    minesweeper._RESET_SURF, minesweeper._RESET_RECT = minesweeper.draw_smiley(WINDOWWIDTH/2, 50, 'check.png')
+                    game_over = minesweeper.reveal_box(x, y)
 
             # Check if reset box is clicked
             if minesweeper._RESET_RECT.collidepoint(mouse_x, mouse_y):
                 minesweeper.highlight_button(minesweeper._RESET_RECT)
                 if mouse_clicked:
                     minesweeper.new_game()
+                    has_game_ended = True
 
             # Highlight unrevealed box
             box_x, box_y = minesweeper.get_box_at_pixel(mouse_x, mouse_y)
