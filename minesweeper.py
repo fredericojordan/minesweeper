@@ -8,20 +8,20 @@ from pygame.locals import *
 
 # AI
 #AI_TYPE = "FRED"
-#AI_TYPE = "RANDOM"
+AI_TYPE = "RANDOM"
 #AI_TYPE = "ANN"
-AI_TYPE = "HUMAN"
+#AI_TYPE = "HUMAN"
 
 # TRAINING
-TRAINING = False
+TRAINING = True
 
 # DIFFICULTY
 BEGINNER = (9, 9, 10)
 INTERMEDIATE = (16, 16, 40)
 EXPERT = (30, 16, 99)
-TEST = (3, 3, 2)
+TEST = (4, 4, 2)
 
-FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = INTERMEDIATE
+FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = TEST
 
 # UI
 FPS = 30
@@ -480,6 +480,7 @@ def main():
 
         # For random training
         chosen_squares = []
+        chosen_squares_length = 1
 
         # Main game loop
         while not has_game_ended:
@@ -502,7 +503,6 @@ def main():
                 while not new_position:
                     choice = [[random.choice(range(FIELDWIDTH)),random.choice(range(FIELDHEIGHT))]]
                     if minesweeper.revealed_boxes[choice[0][0]][choice[0][1]] == False:
-                        chosen_squares.append(choice)
                         new_position = True
                 safe_squares = choice
 
@@ -525,13 +525,17 @@ def main():
                         if box_x is not None and box_y is not None:
                             flagged_squares = [(box_x, box_y)]
 
+            # Keeps track of chosen squares
+            if len(safe_squares) > 0:
+                chosen_squares.append(safe_squares)
+
             # Checks if game is over for AI
             if AI_TYPE != 'HUMAN':
                 if game_over:
                     has_game_ended = True
 
             # Saves turn
-            if TRAINING:
+            if TRAINING and chosen_squares_length == len(chosen_squares):
                 turn = minesweeper.save_turn()
 
             # Apply game changes
@@ -544,7 +548,8 @@ def main():
                     game_over = minesweeper.reveal_box(x, y)
 
             #Add play to DB
-            if TRAINING:
+            if TRAINING and chosen_squares_length == len(chosen_squares) and len(safe_squares) > 0 and minesweeper.mine_field[safe_squares[0][0]][safe_squares[0][1]] != 'X':
+                chosen_squares_length += 1
                 turn_chosen_square = minesweeper.save_chosen_square(safe_squares)
                 db.append((np.asarray(turn),np.asarray(turn_chosen_square)))
                 print(db[plays])
