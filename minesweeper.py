@@ -1,3 +1,4 @@
+import numpy as np
 import os
 import random
 import sys
@@ -11,12 +12,16 @@ from pygame.locals import *
 #AI_TYPE = "ANN"
 AI_TYPE = "HUMAN"
 
+# TRAINING
+TRAINING = False
+
 # DIFFICULTY
 BEGINNER = (9, 9, 10)
 INTERMEDIATE = (16, 16, 40)
 EXPERT = (30, 16, 99)
+TEST = (3, 3, 2)
 
-FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = BEGINNER
+FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = TEST
 
 # UI
 FPS = 30
@@ -155,6 +160,29 @@ class Minesweeper:
             "score": score,
         })
 #         print(self.database[-1])
+
+    def save_turn(self):
+    # Saves input for ANN training
+        turn = []
+        for i in range(FIELDWIDTH):
+            for j in range(FIELDHEIGHT):
+                square = []
+                if self.revealed_boxes[i][j]:
+                    square.append(self.mine_field[i][j])
+                else:
+                    square.append(-1)
+                turn.append(square)
+        return turn
+
+    def save_chosen_square(self, chosen_square):
+    # Saves output for ANN training
+        print('Chosen box:',chosen_square)
+        output = []
+        for _ in range(FIELDHEIGHT * FIELDWIDTH):
+            output.append([0])
+        output[chosen_square[0][0]*FIELDHEIGHT+chosen_square[0][1]] = [1]
+
+        return output
 
     def available_info(self):
         info = []
@@ -432,6 +460,8 @@ class Minesweeper:
 
 def main():
     tries = 0
+    plays = 0
+    db = []
     
     minesweeper = Minesweeper()
     
@@ -446,7 +476,7 @@ def main():
         minesweeper.new_game()
         
         tries += 1
-        print(tries)
+        print('Jogo', tries)
 
         # For random training
         chosen_squares = []
@@ -495,11 +525,16 @@ def main():
                         if box_x is not None and box_y is not None:
                             flagged_squares = [(box_x, box_y)]
 
-            # Apply game changes
+            # Checks if game is over for AI
             if AI_TYPE != 'HUMAN':
                 if game_over:
                     has_game_ended = True
 
+            # Saves turn
+            if TRAINING:
+                turn = minesweeper.save_turn()
+
+            # Apply game changes
             if not game_over:
                 for x, y in flagged_squares:
                     minesweeper.toggle_flag_box(x, y)
@@ -507,6 +542,13 @@ def main():
                 for x, y in safe_squares:
                     minesweeper._RESET_SURF, minesweeper._RESET_RECT = minesweeper.draw_smiley(WINDOWWIDTH/2, 50, 'check.png')
                     game_over = minesweeper.reveal_box(x, y)
+
+            #Add play to DB
+            if TRAINING:
+                turn_chosen_square = minesweeper.save_chosen_square(safe_squares)
+                db.append((np.asarray(turn),np.asarray(turn_chosen_square)))
+                print(db[plays])
+                plays += 1
 
             # Check if reset box is clicked
             if minesweeper._RESET_RECT.collidepoint(mouse_x, mouse_y):
