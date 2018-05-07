@@ -3,3 +3,4 @@ venv/
 .project
 .pydevproject
 **/.DS_Store
+__pycache__

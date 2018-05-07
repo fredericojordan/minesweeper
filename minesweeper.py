@@ -6,6 +6,8 @@ import sys
 import pygame
 from pygame.locals import *
 
+from network import Network
+
 # AI
 #AI_TYPE = "FRED"
 AI_TYPE = "RANDOM"
@@ -14,6 +16,7 @@ AI_TYPE = "RANDOM"
 
 # TRAINING
 TRAINING = True
+TRAINING_COMPLETE = 10000
 
 # DIFFICULTY
 BEGINNER = (9, 9, 10)
@@ -457,11 +460,28 @@ class Minesweeper:
         safe_squares = self.get_AI_safe_squares(info, guess=True)
         return safe_squares, flagged_squares
 
-
+    def data_treat(self, db):
+        '''Prepares date to be trained'''
+        new_db = []
+        while len(db) > 0:
+            input = db[0][0]
+            output = db[0][1]
+            to_delete = [0]
+            for i in range(1,len(db)):
+                if np.array_equal(db[i][0], db[0][0]):
+                    output += db[i][1]
+                    to_delete = [i] + to_delete
+            for j in to_delete:
+                del(db[j])
+            output[np.nonzero(output)] = 1
+            new_db.append((input, output))
+        return new_db
+    
 def main():
     tries = 0
     plays = 0
-    db = []
+    db_good = []
+    db_bad = []
     
     minesweeper = Minesweeper()
     
@@ -548,12 +568,33 @@ def main():
                     game_over = minesweeper.reveal_box(x, y)
 
             #Add play to DB
-            if TRAINING and chosen_squares_length == len(chosen_squares) and len(safe_squares) > 0 and minesweeper.mine_field[safe_squares[0][0]][safe_squares[0][1]] != 'X':
+            if TRAINING and chosen_squares_length == len(chosen_squares) and len(safe_squares) > 0:
                 chosen_squares_length += 1
                 turn_chosen_square = minesweeper.save_chosen_square(safe_squares)
-                db.append((np.asarray(turn),np.asarray(turn_chosen_square)))
-                print(db[plays])
-                plays += 1
+                if minesweeper.mine_field[safe_squares[0][0]][safe_squares[0][1]] != 'X':
+                    db_good.append((np.asarray(turn),np.asarray(turn_chosen_square)))
+                    #print('GOOD', db_good[-1])
+                
+                if minesweeper.mine_field[safe_squares[0][0]][safe_squares[0][1]] == 'X':
+                    db_bad.append((np.asarray(turn),np.asarray(turn_chosen_square)))
+                    #print('BAD', db_bad[-1])
+                
+                plays += 1            
+                if plays > TRAINING_COMPLETE:
+                    db_good = minesweeper.data_treat(db_good)
+                    db_bad = minesweeper.data_treat(db_bad)
+                    print('GOOD',db_good[0])
+                    print('BAD',db_bad[0])
+                    div = int(len(db_good)*.8)
+                    training_data = db_good[:div]
+                    test_data = db_good[div:]
+                    net = Network([FIELDHEIGHT*FIELDWIDTH, 32, 16, FIELDHEIGHT*FIELDWIDTH])
+                    print('Network training started...\n')
+                    net.SGD(training_data, 30, 10, 0.1, lmbda=5.0)
+                    net.save('ANN_test')
+
+                    print('score = {:.2f} %'.format(net.accuracy(test_data)/100))
+                    minesweeper.terminate()
 
             # Check if reset box is clicked
             if minesweeper._RESET_RECT.collidepoint(mouse_x, mouse_y):
@@ -570,7 +611,6 @@ def main():
             # Update screen, wait clock tick
             pygame.display.update()
             minesweeper.clock.tick(FPS)
-
 
 if __name__ == '__main__':
     main()
