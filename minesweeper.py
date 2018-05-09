@@ -1,10 +1,14 @@
+# -*- coding: utf-8 -*-
 import json
 import os
 import random
 import sys
 
+import numpy as np
 import pygame
 from pygame.locals import *
+
+from neural.network import Network
 
 # AI
 AI_ENABLED = True
@@ -17,7 +21,7 @@ EXPERT = (24, 24, 99)
 FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = EXPERT
 
 # PERSISTENT DATA
-LOG_TO_FILE = False
+LOG_TO_FILE = True
 DATABASE_FILENAME = 'data.txt'
 
 # UI
@@ -147,8 +151,6 @@ class Minesweeper:
             return False
 
     def save_turn(self, selected_square):
-        info = self.available_info()
-
         if self.mine_field[selected_square[0]][selected_square[1]] == MINE:
             score = 0
         else:
@@ -157,8 +159,8 @@ class Minesweeper:
             score = float(safe_count)/float(total_safe_squares)
 
         database_entry = json.dumps({
-            "turn": info,
-            "move": selected_square,
+            "minefield": network_input(self.available_info()),
+            "move": hot_vector(selected_square),
             "score": score,
         })
         self.database.write(database_entry)
@@ -503,5 +505,62 @@ def main():
             minesweeper.clock.tick(FPS)
 
 
+def train_network():
+    np.random.seed(420)
+
+    total_nodes = FIELDWIDTH*FIELDHEIGHT
+    print('Initializing neural network...')
+    net = Network([total_nodes, total_nodes, total_nodes])
+
+    '''
+     Let's try training our network for 30 complete epochs, using mini-batches of 10 training examples
+     at a time, a learning rate η=0.1, and regularization parameter λ=5.0.
+     As we train we'll monitor the classification accuracy on the validation_data.
+     '''
+    print('Loading data...')
+    training_data, validation_data, test_data = load_data(DATABASE_FILENAME)
+    print('Network training started...')
+    net.SGD(training_data, 30, 10, 0.1, lmbda=5.0, evaluation_data=validation_data, monitor_evaluation_accuracy=True)
+    net.save('network')
+    # net.load('.npz')
+
+    print('score = {:.2f} %'.format(net.accuracy(test_data)/100))
+
+
+def load_data(filename):
+    training_data = []
+    test_data = []
+    read_file = open(filename, 'r')
+
+    for line in read_file:
+        line_dict = json.loads(line)
+        if line_dict.get('score') > 0:
+            entry = (
+                np.array(network_input(line_dict.get('turn'))),
+                np.array(hot_vector(line_dict.get('move'))),
+            )
+            training_data.append(entry)
+            test_data.append((
+                np.array(network_input(line_dict.get('turn'))),
+                line_dict.get('move')[0] + FIELDWIDTH*line_dict.get('move')[1],
+            ))
+
+    read_file.close()
+
+    return training_data, test_data[:100], test_data[:100]
+
+
+def network_input(available_info):
+    minefield = []
+    for line in available_info:
+        minefield.extend(line)
+    return [i if not i == -2 else -1 for i in minefield]
+
+
+def hot_vector(square):
+    return [1 if i == square[0] + FIELDWIDTH*square[1] else 0 for i in range(FIELDHEIGHT*FIELDWIDTH)]
+
+
 if __name__ == '__main__':
-    main()
+    # main()
+    train_network()
