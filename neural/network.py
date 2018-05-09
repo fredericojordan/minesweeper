@@ -90,7 +90,7 @@ class Network(object):
         layers.
 
         """
-        self.biases = [np.random.randn(y, 1) for y in self.sizes[1:]]
+        self.biases = [np.random.randn(y) for y in self.sizes[1:]]
         self.weights = [np.random.randn(y, x)/np.sqrt(x)
                         for x, y in zip(self.sizes[:-1], self.sizes[1:])]
 
@@ -172,11 +172,11 @@ class Network(object):
                 evaluation_cost.append(cost)
                 print("Cost on evaluation data: {}".format(cost))
             if monitor_evaluation_accuracy:
-                accuracy = self.accuracy(evaluation_data)
+                accuracy = self.accuracy(evaluation_data, convert=True)
                 evaluation_accuracy.append(accuracy)
-                print("Accuracy on evaluation data: {} / {} ({:.2f} %)".format(self.accuracy(evaluation_data),
+                print("Accuracy on evaluation data: {} / {} ({:.2f} %)".format(accuracy,
                                                                                n_data,
-                                                                               100*self.accuracy(evaluation_data)/n_data))
+                                                                               100*accuracy/n_data))
             print('--')
         return evaluation_cost, evaluation_accuracy, \
             training_cost, training_accuracy
@@ -275,7 +275,8 @@ class Network(object):
         cost = 0.0
         for x, y in data:
             a = self.feedforward(x)
-            if convert: y = vectorized_result(y)
+            if convert:
+                y = vectorized_result(y)
             cost += self.cost.fn(a, y)/len(data)
         cost += 0.5*(lmbda/len(data))*sum(
             np.linalg.norm(w)**2 for w in self.weights)
@@ -296,6 +297,19 @@ class Network(object):
         self.weights = model_file['weights']
         self.biases = model_file['biases']
 
+    def toFile(self, filename):
+        a = open(filename, 'a')
+        a.write('sizes:{}\n'.format(self.sizes))
+        a.write('weights:\n')
+        for w in self.weights:
+            a.write('[')
+            for l in w:
+                a.write('  [')
+                a.write(', '.join(str(i) for i in l))
+                a.write(']\n')
+            a.write(']\n')
+        a.write('biases:\n{}\n'.format('\n'.join(str(b) for b in self.biases)))
+        a.close()
 
 # ----- Miscellaneous functions -----
 

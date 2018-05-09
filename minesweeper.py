@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
+import math
 import os
 import random
 import sys
@@ -17,11 +18,13 @@ AI_ENABLED = True
 BEGINNER = (8, 8, 10)
 INTERMEDIATE = (16, 16, 40)
 EXPERT = (24, 24, 99)
+TEST = (4, 4, 2)
 
-FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = EXPERT
+FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = TEST
 
 # PERSISTENT DATA
-LOG_TO_FILE = True
+# LOG_TO_FILE = True
+LOG_TO_FILE = False
 DATABASE_FILENAME = 'data.txt'
 
 # UI
@@ -62,33 +65,37 @@ HIDDEN = -1
 
 
 class Minesweeper:
-    def __init__(self):
+    def __init__(self, has_ui=True):
         # random.seed(0)  # Seed the RNG for DEBUG purposes
-        pygame.init()
-        pygame.display.set_caption('Minesweeper')
 
-        self.clock = pygame.time.Clock()
+        self.net = Network([])
+        self.net.load('network.npz')
 
-        # load GUI
-        self._display_surface = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
-        self._BASICFONT = pygame.font.SysFont(FONTTYPE, FONTSIZE)
-        self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH / 2, 50)
-        #         self._RESET_SURF, self._RESET_RECT = self.draw_button('RESET', TEXTCOLOR, RESETBGCOLOR, WINDOWWIDTH/2, 50)
-        self._images = {
-            '0': pygame.transform.scale(pygame.image.load(os.path.join('media', '0.png')), (BOXSIZE, BOXSIZE)),
-            '1': pygame.transform.scale(pygame.image.load(os.path.join('media', '1.png')), (BOXSIZE, BOXSIZE)),
-            '2': pygame.transform.scale(pygame.image.load(os.path.join('media', '2.png')), (BOXSIZE, BOXSIZE)),
-            '3': pygame.transform.scale(pygame.image.load(os.path.join('media', '3.png')), (BOXSIZE, BOXSIZE)),
-            '4': pygame.transform.scale(pygame.image.load(os.path.join('media', '4.png')), (BOXSIZE, BOXSIZE)),
-            '5': pygame.transform.scale(pygame.image.load(os.path.join('media', '5.png')), (BOXSIZE, BOXSIZE)),
-            '6': pygame.transform.scale(pygame.image.load(os.path.join('media', '6.png')), (BOXSIZE, BOXSIZE)),
-            '7': pygame.transform.scale(pygame.image.load(os.path.join('media', '7.png')), (BOXSIZE, BOXSIZE)),
-            '8': pygame.transform.scale(pygame.image.load(os.path.join('media', '8.png')), (BOXSIZE, BOXSIZE)),
-            'hidden': pygame.transform.scale(pygame.image.load(os.path.join('media', 'hidden.png')),
-                                             (BOXSIZE, BOXSIZE)),
-            'flag': pygame.transform.scale(pygame.image.load(os.path.join('media', 'flag.png')), (BOXSIZE, BOXSIZE)),
-            'mine': pygame.transform.scale(pygame.image.load(os.path.join('media', 'mine.png')), (BOXSIZE, BOXSIZE)),
-        }
+        if has_ui:
+            pygame.init()
+            pygame.display.set_caption('Minesweeper')
+
+            self.clock = pygame.time.Clock()
+
+            # load GUI
+            self._display_surface = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
+            self._BASICFONT = pygame.font.SysFont(FONTTYPE, FONTSIZE)
+            self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH / 2, 50)
+            self._images = {
+                '0': pygame.transform.scale(pygame.image.load(os.path.join('media', '0.png')), (BOXSIZE, BOXSIZE)),
+                '1': pygame.transform.scale(pygame.image.load(os.path.join('media', '1.png')), (BOXSIZE, BOXSIZE)),
+                '2': pygame.transform.scale(pygame.image.load(os.path.join('media', '2.png')), (BOXSIZE, BOXSIZE)),
+                '3': pygame.transform.scale(pygame.image.load(os.path.join('media', '3.png')), (BOXSIZE, BOXSIZE)),
+                '4': pygame.transform.scale(pygame.image.load(os.path.join('media', '4.png')), (BOXSIZE, BOXSIZE)),
+                '5': pygame.transform.scale(pygame.image.load(os.path.join('media', '5.png')), (BOXSIZE, BOXSIZE)),
+                '6': pygame.transform.scale(pygame.image.load(os.path.join('media', '6.png')), (BOXSIZE, BOXSIZE)),
+                '7': pygame.transform.scale(pygame.image.load(os.path.join('media', '7.png')), (BOXSIZE, BOXSIZE)),
+                '8': pygame.transform.scale(pygame.image.load(os.path.join('media', '8.png')), (BOXSIZE, BOXSIZE)),
+                'hidden': pygame.transform.scale(pygame.image.load(os.path.join('media', 'hidden.png')),
+                                                 (BOXSIZE, BOXSIZE)),
+                'flag': pygame.transform.scale(pygame.image.load(os.path.join('media', 'flag.png')), (BOXSIZE, BOXSIZE)),
+                'mine': pygame.transform.scale(pygame.image.load(os.path.join('media', 'mine.png')), (BOXSIZE, BOXSIZE)),
+            }
 
         self.database = open(DATABASE_FILENAME, 'a')
         self.mine_field, self.revealed_boxes, self.flagged_mines = self.new_game()
@@ -197,7 +204,7 @@ class Minesweeper:
         self.revealed_boxes[x][y] = True
 
         if self.is_game_won():
-            print('WIN!!!')
+            # print('WIN!!!')
             has_game_ended = True
 
         # when 0 is revealed, show relevant boxes
@@ -426,11 +433,40 @@ class Minesweeper:
         safe_squares = self.get_AI_safe_squares(info, guess=True)
         return safe_squares, flagged_squares
 
+    def get_random_input(self, info):
+        """Returns random clickable square"""
+        x, y = random.choice(range(FIELDWIDTH)), random.choice(range(FIELDHEIGHT))
+        while not info[x][y] == -1:
+            x, y = random.choice(range(FIELDWIDTH)), random.choice(range(FIELDHEIGHT))
+        return [(x, y)]
 
-def main():
+    def get_nn_input(self, info):
+        """Gets NN input"""
+        nn_input = np.array(network_input(info))
+        clickables = [i for i, v in enumerate(nn_input) if v == -1]
+        output = self.net.feedforward(nn_input)
+        filtered_output = [v if i in clickables else 0 for i, v in enumerate(output)]
+
+        index = np.argmax(filtered_output)
+
+        y = index % FIELDWIDTH
+        x = int(math.floor(index / FIELDWIDTH))
+
+        # print(info)
+        # print(nn_input)
+        # print(clickables)
+        # print(output)
+        # print(filtered_output)
+        # print(index)
+        # print([x, y])
+        # print('')
+        return [(x, y)]
+
+def main(ui=True):
     tries = 0
+    wins = 0
 
-    minesweeper = Minesweeper()
+    minesweeper = Minesweeper(has_ui=ui)
 
     # stores XY of mouse events
     mouse_x = 0
@@ -442,7 +478,7 @@ def main():
         minesweeper.new_game()
 
         tries += 1
-        print(tries)
+        print('{}/{} ({:.1f}%)'.format(wins, tries, 100*float(wins)/float(tries)))
 
         # Main game loop
         while not has_game_ended:
@@ -452,31 +488,35 @@ def main():
             flagged_squares = []
 
             # Draw screen
-            minesweeper.draw_field()
+            if ui:
+                minesweeper.draw_field()
 
             # Get AI input
             if AI_ENABLED:
                 info = minesweeper.available_info()
-                safe_squares, flagged_squares = minesweeper.get_AI_input(info)
+                # safe_squares, flagged_squares = minesweeper.get_AI_input(info)
+                # safe_squares = minesweeper.get_random_input(info)
+                safe_squares = minesweeper.get_nn_input(info)
 
             # Get player input
-            for event in pygame.event.get():
-                if event.type == QUIT or (event.type == KEYDOWN and (event.key == K_ESCAPE or event.key == K_q)):
-                    minesweeper.terminate()
-                elif event.type == MOUSEMOTION:
-                    mouse_x, mouse_y = event.pos
-                elif event.type == MOUSEBUTTONDOWN:
-                    if event.button == LEFT_CLICK:
+            if ui:
+                for event in pygame.event.get():
+                    if event.type == QUIT or (event.type == KEYDOWN and (event.key == K_ESCAPE or event.key == K_q)):
+                        minesweeper.terminate()
+                    elif event.type == MOUSEMOTION:
                         mouse_x, mouse_y = event.pos
-                        mouse_clicked = True
-                        box_x, box_y = minesweeper.get_box_at_pixel(mouse_x, mouse_y)
-                        if box_x is not None and box_y is not None:
-                            safe_squares = [(box_x, box_y)]
-                    if event.button == RIGHT_CLICK:
-                        mouse_x, mouse_y = event.pos
-                        box_x, box_y = minesweeper.get_box_at_pixel(mouse_x, mouse_y)
-                        if box_x is not None and box_y is not None:
-                            flagged_squares = [(box_x, box_y)]
+                    elif event.type == MOUSEBUTTONDOWN:
+                        if event.button == LEFT_CLICK:
+                            mouse_x, mouse_y = event.pos
+                            mouse_clicked = True
+                            box_x, box_y = minesweeper.get_box_at_pixel(mouse_x, mouse_y)
+                            if box_x is not None and box_y is not None:
+                                safe_squares = [(box_x, box_y)]
+                        if event.button == RIGHT_CLICK:
+                            mouse_x, mouse_y = event.pos
+                            box_x, box_y = minesweeper.get_box_at_pixel(mouse_x, mouse_y)
+                            if box_x is not None and box_y is not None:
+                                flagged_squares = [(box_x, box_y)]
 
             # Apply game changes
             for x, y in flagged_squares:
@@ -487,29 +527,33 @@ def main():
                 if LOG_TO_FILE:
                     minesweeper.save_turn([x, y])
                 if has_game_ended:
+                    if minesweeper.is_game_won():
+                        wins += 1
                     break
 
             # Check if reset box is clicked
-            if minesweeper._RESET_RECT.collidepoint(mouse_x, mouse_y):
-                minesweeper.highlight_button(minesweeper._RESET_RECT)
-                if mouse_clicked:
-                    minesweeper.new_game()
+            if ui:
+                if minesweeper._RESET_RECT.collidepoint(mouse_x, mouse_y):
+                    minesweeper.highlight_button(minesweeper._RESET_RECT)
+                    if mouse_clicked:
+                        minesweeper.new_game()
 
             # Highlight unrevealed box
-            box_x, box_y = minesweeper.get_box_at_pixel(mouse_x, mouse_y)
-            if box_x is not None and box_y is not None and not minesweeper.revealed_boxes[box_x][box_y]:
-                minesweeper.highlight_box(box_x, box_y)
+            if ui:
+                box_x, box_y = minesweeper.get_box_at_pixel(mouse_x, mouse_y)
+                if box_x is not None and box_y is not None and not minesweeper.revealed_boxes[box_x][box_y]:
+                    minesweeper.highlight_box(box_x, box_y)
 
-            # Update screen, wait clock tick
-            pygame.display.update()
-            minesweeper.clock.tick(FPS)
+                # Update screen, wait clock tick
+                pygame.display.update()
+                minesweeper.clock.tick(FPS)
 
 
 def train_network():
     np.random.seed(420)
 
     total_nodes = FIELDWIDTH*FIELDHEIGHT
-    print('Initializing neural network...')
+    print('Initializing neural network... ({})'.format([total_nodes, total_nodes, total_nodes]))
     net = Network([total_nodes, total_nodes, total_nodes])
 
     '''
@@ -518,36 +562,32 @@ def train_network():
      As we train we'll monitor the classification accuracy on the validation_data.
      '''
     print('Loading data...')
-    training_data, validation_data, test_data = load_data(DATABASE_FILENAME)
+    training_data = load_data(DATABASE_FILENAME)
     print('Network training started...')
-    net.SGD(training_data, 30, 10, 0.1, lmbda=5.0, evaluation_data=validation_data, monitor_evaluation_accuracy=True)
+    net.SGD(training_data, 30, 10, 0.1, lmbda=5.0, evaluation_data=training_data[:100], monitor_evaluation_accuracy=True)
     net.save('network')
-    # net.load('.npz')
+    net.toFile('network.txt')
 
-    print('score = {:.2f} %'.format(net.accuracy(test_data)/100))
+    print('score = {:.2f} %'.format(100*net.accuracy(training_data, convert=True)/len(training_data)))
+
+    return net
 
 
 def load_data(filename):
     training_data = []
-    test_data = []
     read_file = open(filename, 'r')
 
     for line in read_file:
         line_dict = json.loads(line)
         if line_dict.get('score') > 0:
-            entry = (
-                np.array(network_input(line_dict.get('turn'))),
-                np.array(hot_vector(line_dict.get('move'))),
-            )
-            training_data.append(entry)
-            test_data.append((
-                np.array(network_input(line_dict.get('turn'))),
-                line_dict.get('move')[0] + FIELDWIDTH*line_dict.get('move')[1],
+            training_data.append((
+                np.array(line_dict.get('minefield')),
+                np.array(line_dict.get('move')),
             ))
 
     read_file.close()
 
-    return training_data, test_data[:100], test_data[:100]
+    return training_data
 
 
 def network_input(available_info):
@@ -562,5 +602,5 @@ def hot_vector(square):
 
 
 if __name__ == '__main__':
-    # main()
-    train_network()
+    main(ui=False)
+    # train_network()
