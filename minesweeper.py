@@ -1,4 +1,4 @@
-import json
+import numpy as np
 import os
 import random
 import sys
@@ -6,36 +6,42 @@ import sys
 import pygame
 from pygame.locals import *
 
+from network import Network
+
 # AI
-AI_ENABLED = True
+#AI_TYPE = "FRED"
+AI_TYPE = "RANDOM"
+#AI_TYPE = "ANN"
+#AI_TYPE = "HUMAN"
+
+# TRAINING
+TRAINING = True
+TRAINING_COMPLETE = 10000
 
 # DIFFICULTY
-BEGINNER = (8, 8, 10)
+BEGINNER = (9, 9, 10)
 INTERMEDIATE = (16, 16, 40)
-EXPERT = (24, 24, 99)
+EXPERT = (30, 16, 99)
+TEST = (4, 4, 2)
 
-FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = EXPERT
-
-# PERSISTENT DATA
-LOG_TO_FILE = False
-DATABASE_FILENAME = 'data.txt'
+FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = TEST
 
 # UI
 FPS = 30
 BOXSIZE = 30
-WINDOWWIDTH = FIELDWIDTH * BOXSIZE + 85
-WINDOWHEIGHT = FIELDWIDTH * BOXSIZE + 135
-XMARGIN = int((WINDOWWIDTH - (FIELDWIDTH * BOXSIZE)) / 2)
-YMARGIN = XMARGIN + 50
+WINDOWWIDTH = FIELDWIDTH*BOXSIZE+85
+WINDOWHEIGHT = FIELDHEIGHT*BOXSIZE+135
+XMARGIN = int((WINDOWWIDTH-(FIELDWIDTH*BOXSIZE))/2)
+YMARGIN = XMARGIN+50
 
 # INPUT
 LEFT_CLICK = 1
 RIGHT_CLICK = 3
 
 # assertions
-assert MINESTOTAL < FIELDHEIGHT * FIELDWIDTH, 'More mines than boxes'
-assert BOXSIZE ^ 2 * (FIELDHEIGHT * FIELDWIDTH) < WINDOWHEIGHT * WINDOWWIDTH, 'Boxes will not fit on screen'
-assert BOXSIZE / 2 > 5, 'Bounding errors when drawing rectangle, cannot use half-5 in draw_mines_numbers'
+assert MINESTOTAL < FIELDHEIGHT*FIELDWIDTH, 'More mines than boxes'
+assert BOXSIZE^2 * (FIELDHEIGHT*FIELDWIDTH) < WINDOWHEIGHT*WINDOWWIDTH, 'Boxes will not fit on screen'
+assert BOXSIZE/2 > 5, 'Bounding errors when drawing rectangle, cannot use half-5 in draw_mines_numbers'
 
 # COLORS
 LIGHTGRAY = (225, 225, 225)
@@ -48,7 +54,7 @@ TEXTCOLOR = BLACK
 HIGHLIGHTCOLOR = DARKGRAY
 RESETBGCOLOR = LIGHTGRAY
 
-# set up font
+# set up font 
 FONTTYPE = 'Courier New'
 FONTSIZE = 20
 
@@ -58,19 +64,19 @@ HIDDEN = -1
 
 
 class Minesweeper:
+    
     def __init__(self):
         # random.seed(0)  # Seed the RNG for DEBUG purposes
         pygame.init()
         pygame.display.set_caption('Minesweeper')
-
+        
         self.clock = pygame.time.Clock()
-
+        
         # load GUI
         self._display_surface = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
         self._BASICFONT = pygame.font.SysFont(FONTTYPE, FONTSIZE)
-        self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH / 2, 50)
-        #         self._RESET_SURF, self._RESET_RECT = self.draw_button('RESET', TEXTCOLOR, RESETBGCOLOR, WINDOWWIDTH/2, 50)
-        self._images = {
+#         self._RESET_SURF, self._RESET_RECT = self.draw_button('RESET', TEXTCOLOR, RESETBGCOLOR, WINDOWWIDTH/2, 50)
+        self._images = {    
             '0': pygame.transform.scale(pygame.image.load(os.path.join('media', '0.png')), (BOXSIZE, BOXSIZE)),
             '1': pygame.transform.scale(pygame.image.load(os.path.join('media', '1.png')), (BOXSIZE, BOXSIZE)),
             '2': pygame.transform.scale(pygame.image.load(os.path.join('media', '2.png')), (BOXSIZE, BOXSIZE)),
@@ -80,23 +86,24 @@ class Minesweeper:
             '6': pygame.transform.scale(pygame.image.load(os.path.join('media', '6.png')), (BOXSIZE, BOXSIZE)),
             '7': pygame.transform.scale(pygame.image.load(os.path.join('media', '7.png')), (BOXSIZE, BOXSIZE)),
             '8': pygame.transform.scale(pygame.image.load(os.path.join('media', '8.png')), (BOXSIZE, BOXSIZE)),
-            'hidden': pygame.transform.scale(pygame.image.load(os.path.join('media', 'hidden.png')),
-                                             (BOXSIZE, BOXSIZE)),
+            'hidden': pygame.transform.scale(pygame.image.load(os.path.join('media', 'hidden.png')), (BOXSIZE, BOXSIZE)),
             'flag': pygame.transform.scale(pygame.image.load(os.path.join('media', 'flag.png')), (BOXSIZE, BOXSIZE)),
             'mine': pygame.transform.scale(pygame.image.load(os.path.join('media', 'mine.png')), (BOXSIZE, BOXSIZE)),
         }
-
-        self.database = open(DATABASE_FILENAME, 'a')
-        self.mine_field, self.revealed_boxes, self.flagged_mines = self.new_game()
-
+        
+        self.database = []
+        self.mine_field, self.revealed_boxes, self.flagged_mines = self.new_game() #, self.game_over
+        
     def new_game(self):
         """Set up mine field data structure, list of all zeros for recursion, and revealed box boolean data structure"""
+        self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH/2, 50, 'smiley.png')
+        #self.game_over = False
         self.mine_field = self.get_random_minefield()
         self.revealed_boxes = self.get_field_with_value(False)
         self.flagged_mines = self.get_field_with_value(False)
 
-        return self.mine_field, self.revealed_boxes, self.flagged_mines
-
+        return self.mine_field, self.revealed_boxes, self.flagged_mines #, self.game_over
+    
     def get_image(self, box_x, box_y):
         if self.flagged_mines[box_x][box_y]:
             return self._images.get('flag')
@@ -107,66 +114,82 @@ class Minesweeper:
                 return self._images.get(str(self.mine_field[box_x][box_y]))
         else:
             return self._images.get('hidden')
-
+        
     def draw_field(self):
         """Draws field GUI"""
         self._display_surface.fill(BGCOLOR)
-
+    
         for box_x in range(FIELDWIDTH):
             for box_y in range(FIELDHEIGHT):
                 left, top = self.get_left_top_xy(box_x, box_y)
-                self._display_surface.blit(self.get_image(box_x, box_y), (left, top))
-
+                self._display_surface.blit(self.get_image(box_x, box_y), (left,top))
+    
         self._display_surface.blit(self._RESET_SURF, self._RESET_RECT)
-
+                        
     def highlight_box(self, box_x, box_y):
         """Highlight box when mouse hovers over it"""
         left, top = self.get_left_top_xy(box_x, box_y)
         pygame.draw.rect(self._display_surface, HIGHLIGHTCOLOR, (left, top, BOXSIZE, BOXSIZE), 4)
-
+    
     def highlight_button(self, butRect):
         """Highlight button when mouse hovers over it"""
         linewidth = 4
-        pygame.draw.rect(self._display_surface, HIGHLIGHTCOLOR, (
-        butRect.left - linewidth, butRect.top - linewidth, butRect.width + 2 * linewidth,
-        butRect.height + 2 * linewidth), linewidth)
+        pygame.draw.rect(self._display_surface, HIGHLIGHTCOLOR, (butRect.left-linewidth, butRect.top-linewidth, butRect.width+2*linewidth, butRect.height+2*linewidth), linewidth)
 
     def is_game_won(self):
         """Checks if player has revealed all boxes"""
         not_mine_count = 0
-
+    
         for box_x in range(FIELDWIDTH):
             for box_y in range(FIELDHEIGHT):
                 if self.revealed_boxes[box_x][box_y] == True:
                     if self.mine_field[box_x][box_y] != MINE:
                         not_mine_count += 1
-
-        if not_mine_count >= (FIELDWIDTH * FIELDHEIGHT) - MINESTOTAL:
+    
+        if not_mine_count >= (FIELDWIDTH*FIELDHEIGHT) - MINESTOTAL:
             return True
         else:
             return False
-
-    def save_turn(self, selected_square):
+        
+    def _save_turn(self):
         info = self.available_info()
-
-        if self.mine_field[selected_square[0]][selected_square[1]] == MINE:
-            score = 0
-        else:
-            total_safe_squares = (FIELDHEIGHT*FIELDWIDTH) - MINESTOTAL
-            safe_count = sum(column.count(True) for column in self.revealed_boxes)
-            score = float(safe_count)/float(total_safe_squares)
-
-        database_entry = json.dumps({
+            
+        score = 0
+        for col in info:
+            score += sum(i != MINE and i != -1 for i in col)
+        
+        self.database.append({
             "turn": info,
-            "move": selected_square,
             "score": score,
         })
-        self.database.write(database_entry)
-        self.database.write('\n')
+#         print(self.database[-1])
+
+    def save_turn(self):
+    # Saves input for ANN training
+        turn = []
+        for i in range(FIELDWIDTH):
+            for j in range(FIELDHEIGHT):
+                square = []
+                if self.revealed_boxes[i][j]:
+                    square.append(self.mine_field[i][j])
+                else:
+                    square.append(-1)
+                turn.append(square)
+        return turn
+
+    def save_chosen_square(self, chosen_square):
+    # Saves output for ANN training
+        print('Chosen box:',chosen_square)
+        output = []
+        for _ in range(FIELDHEIGHT * FIELDWIDTH):
+            output.append([0])
+        output[chosen_square[0][0]*FIELDHEIGHT+chosen_square[0][1]] = [1]
+
+        return output
 
     def available_info(self):
         info = []
-
+        
         for x in range(len(self.mine_field)):
             line = []
             for y in range(len(self.mine_field[x])):
@@ -178,25 +201,28 @@ class Minesweeper:
                     except:
                         line.append('X')
             info.append(line)
-
-        # self.debug_field(info, 'info')
+    
+#         self.debug_field(info, 'info')
         return info
-
+    
     def toggle_flag_box(self, x, y):
         """Toggles if mine box is flagged"""
         if not self.flagged_mines[x][y] and not self.revealed_boxes[x][y]:
             self.flagged_mines[x][y] = True
         else:
             self.flagged_mines[x][y] = False
-
+    
     def reveal_box(self, x, y):
         """Reveals box clicked"""
-        has_game_ended = False
+        self.game_over = False
         self.revealed_boxes[x][y] = True
-
+                                               
         if self.is_game_won():
             print('WIN!!!')
-            has_game_ended = True
+            self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH/2, 50, 'win.png')
+            self.game_over = True
+            if AI_TYPE != 'HUMAN':
+                self.new_game() 
 
         # when 0 is revealed, show relevant boxes
         if self.mine_field[x][y] == 0:
@@ -205,41 +231,52 @@ class Minesweeper:
         # when mine is revealed, show mines
         if self.mine_field[x][y] == MINE:
             self.show_mines()
-            has_game_ended = True
+            self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH/2, 50, 'lose.png')
+            self.game_over = True
+            if AI_TYPE != 'HUMAN':
+                self.new_game() 
+        
+        return self.game_over
 
-        return has_game_ended
-
-    def reveal_empty_squares(self, box_x, box_y, zero_list_xy=[]):
+    def reveal_empty_squares(self, box_x, box_y): #, zero_list_xy=[]):
         """Modifies revealed_boxes data structure if chosen box_x & box_y is 0
         Shows all boxes using recursion
         """
         self.revealed_boxes[box_x][box_y] = True
-        self.reveal_adjacent_boxes(box_x, box_y)
-        for i, j in self.get_neighbour_squares([box_x, box_y]):
-            if self.mine_field[i][j] == 0 and [i, j] not in zero_list_xy:
-                zero_list_xy.append([i, j])
-                self.reveal_empty_squares(i, j, zero_list_xy)
+                
+        if box_x > 0 and box_y > 0:
+            if self.revealed_boxes[box_x-1][box_y-1] == False:
+                self.reveal_box(box_x-1, box_y-1)
+            
+        if box_y > 0:
+            if self.revealed_boxes[box_x][box_y-1] == False:
+                self.reveal_box(box_x, box_y-1)
+            
+        if box_x < FIELDWIDTH-1 and box_y > 0:
+            if self.revealed_boxes[box_x+1][box_y-1] == False:
+                self.reveal_box(box_x+1, box_y-1)
+            
+        if box_x > 0:
+            if self.revealed_boxes[box_x-1][box_y] == False:
+                self.reveal_box(box_x-1, box_y)
+            
+        if box_x < FIELDWIDTH-1:
+            if self.revealed_boxes[box_x+1][box_y] == False:
+                self.reveal_box(box_x+1, box_y)
+            
+        if box_x > 0 and box_y < FIELDHEIGHT-1:
+            if self.revealed_boxes[box_x-1][box_y+1] == False:
+                self.reveal_box(box_x-1, box_y+1)
+            
+        if box_y < FIELDHEIGHT-1:
+            if self.revealed_boxes[box_x][box_y+1] == False:
+                self.reveal_box(box_x, box_y+1)
+            
+        if box_x < FIELDWIDTH-1 and box_y < FIELDHEIGHT-1:
+            if self.revealed_boxes[box_x+1][box_y+1] == False:
+                self.reveal_box(box_x+1, box_y+1)
 
-    def reveal_adjacent_boxes(self, box_x, box_y):
-        """Modifies revealed_boxes data structure so that all adjacent boxes to (box_x, box_y) are set to True"""
-        if box_x != 0:
-            self.revealed_boxes[box_x - 1][box_y] = True
-            if box_y != 0:
-                self.revealed_boxes[box_x - 1][box_y - 1] = True
-            if box_y != FIELDHEIGHT - 1:
-                self.revealed_boxes[box_x - 1][box_y + 1] = True
-        if box_x != FIELDWIDTH - 1:
-            self.revealed_boxes[box_x + 1][box_y] = True
-            if box_y != 0:
-                self.revealed_boxes[box_x + 1][box_y - 1] = True
-            if box_y != FIELDHEIGHT - 1:
-                self.revealed_boxes[box_x + 1][box_y + 1] = True
-        if box_y != 0:
-            self.revealed_boxes[box_x][box_y - 1] = True
-        if box_y != FIELDHEIGHT - 1:
-            self.revealed_boxes[box_x][box_y + 1] = True
-
-    def show_mines(self):
+    def show_mines(self):     
         """Modifies revealed_boxes data structure if chosen box_x & box_y is X"""
         for i in range(FIELDWIDTH):
             for j in range(FIELDHEIGHT):
@@ -254,10 +291,10 @@ class Minesweeper:
         but_rect.centery = center_y
 
         return but_surf, but_rect
-
-    def draw_smiley(self, center_x, center_y):
-        surface = pygame.image.load(os.path.join('media', 'smiley.png'))
-        surface = pygame.transform.scale(surface, (30, 30))
+    
+    def draw_smiley(self, center_x, center_y, filename):
+        surface = pygame.image.load(os.path.join('media', filename))
+        surface = pygame.transform.scale(surface, (50, 50))
         rect = surface.get_rect()
         rect.centerx = center_x
         rect.centery = center_y
@@ -302,7 +339,6 @@ class Minesweeper:
 
     def terminate(self):
         """Simple function to exit game"""
-        self.database.close()
         pygame.quit()
         sys.exit()
 
@@ -316,14 +352,14 @@ class Minesweeper:
 
     def get_left_top_xy(self, box_x, box_y):
         """Get left & top coordinates for drawing mine boxes"""
-        left = XMARGIN + box_x * BOXSIZE
-        top = YMARGIN + box_y * BOXSIZE
+        left = XMARGIN + box_x*BOXSIZE
+        top = YMARGIN + box_y*BOXSIZE
         return left, top
 
     def get_center_xy(self, box_x, box_y):
         """Get center coordinates for drawing mine boxes"""
-        center_x = XMARGIN + BOXSIZE / 2 + box_x * BOXSIZE
-        center_y = YMARGIN + BOXSIZE / 2 + box_y * BOXSIZE
+        center_x = XMARGIN + BOXSIZE / 2 + box_x*BOXSIZE
+        center_y = YMARGIN + BOXSIZE / 2 + box_y*BOXSIZE
         return center_x, center_y
 
     def get_box_at_pixel(self, x, y):
@@ -424,23 +460,47 @@ class Minesweeper:
         safe_squares = self.get_AI_safe_squares(info, guess=True)
         return safe_squares, flagged_squares
 
-
+    def data_treat(self, db):
+        '''Prepares date to be trained'''
+        new_db = []
+        while len(db) > 0:
+            input = db[0][0]
+            output = db[0][1]
+            to_delete = [0]
+            for i in range(1,len(db)):
+                if np.array_equal(db[i][0], db[0][0]):
+                    output += db[i][1]
+                    to_delete = [i] + to_delete
+            for j in to_delete:
+                del(db[j])
+            output[np.nonzero(output)] = 1
+            new_db.append((input, output))
+        return new_db
+    
 def main():
     tries = 0
-
+    plays = 0
+    db_good = []
+    db_bad = []
+    
     minesweeper = Minesweeper()
-
+    
     # stores XY of mouse events
     mouse_x = 0
     mouse_y = 0
-
+    
     while True:
         has_game_ended = False
+        game_over = False
 
         minesweeper.new_game()
-
+        
         tries += 1
-        print(tries)
+        print('Jogo', tries)
+
+        # For random training
+        chosen_squares = []
+        chosen_squares_length = 1
 
         # Main game loop
         while not has_game_ended:
@@ -448,14 +508,23 @@ def main():
             mouse_clicked = False
             safe_squares = []
             flagged_squares = []
+            new_position = False # For random training
 
             # Draw screen
             minesweeper.draw_field()
 
-            # Get AI input
-            if AI_ENABLED:
+            # Get Fred's AI input
+            if AI_TYPE == 'FRED':
                 info = minesweeper.available_info()
                 safe_squares, flagged_squares = minesweeper.get_AI_input(info)
+
+            # Get random position
+            if AI_TYPE == 'RANDOM':
+                while not new_position:
+                    choice = [[random.choice(range(FIELDWIDTH)),random.choice(range(FIELDHEIGHT))]]
+                    if minesweeper.revealed_boxes[choice[0][0]][choice[0][1]] == False:
+                        new_position = True
+                safe_squares = choice
 
             # Get player input
             for event in pygame.event.get():
@@ -476,22 +545,63 @@ def main():
                         if box_x is not None and box_y is not None:
                             flagged_squares = [(box_x, box_y)]
 
-            # Apply game changes
-            for x, y in flagged_squares:
-                minesweeper.toggle_flag_box(x, y)
+            # Keeps track of chosen squares
+            if len(safe_squares) > 0:
+                chosen_squares.append(safe_squares)
 
-            for x, y in safe_squares:
-                has_game_ended = minesweeper.reveal_box(x, y)
-                if LOG_TO_FILE:
-                    minesweeper.save_turn([x, y])
-                if has_game_ended:
-                    break
+            # Checks if game is over for AI
+            if AI_TYPE != 'HUMAN':
+                if game_over:
+                    has_game_ended = True
+
+            # Saves turn
+            if TRAINING and chosen_squares_length == len(chosen_squares):
+                turn = minesweeper.save_turn()
+
+            # Apply game changes
+            if not game_over:
+                for x, y in flagged_squares:
+                    minesweeper.toggle_flag_box(x, y)
+
+                for x, y in safe_squares:
+                    minesweeper._RESET_SURF, minesweeper._RESET_RECT = minesweeper.draw_smiley(WINDOWWIDTH/2, 50, 'check.png')
+                    game_over = minesweeper.reveal_box(x, y)
+
+            #Add play to DB
+            if TRAINING and chosen_squares_length == len(chosen_squares) and len(safe_squares) > 0:
+                chosen_squares_length += 1
+                turn_chosen_square = minesweeper.save_chosen_square(safe_squares)
+                if minesweeper.mine_field[safe_squares[0][0]][safe_squares[0][1]] != 'X':
+                    db_good.append((np.asarray(turn),np.asarray(turn_chosen_square)))
+                    #print('GOOD', db_good[-1])
+                
+                if minesweeper.mine_field[safe_squares[0][0]][safe_squares[0][1]] == 'X':
+                    db_bad.append((np.asarray(turn),np.asarray(turn_chosen_square)))
+                    #print('BAD', db_bad[-1])
+                
+                plays += 1            
+                if plays > TRAINING_COMPLETE:
+                    db_good = minesweeper.data_treat(db_good)
+                    db_bad = minesweeper.data_treat(db_bad)
+                    print('GOOD',db_good[0])
+                    print('BAD',db_bad[0])
+                    div = int(len(db_good)*.8)
+                    training_data = db_good[:div]
+                    test_data = db_good[div:]
+                    net = Network([FIELDHEIGHT*FIELDWIDTH, 32, 16, FIELDHEIGHT*FIELDWIDTH])
+                    print('Network training started...\n')
+                    net.SGD(training_data, 30, 10, 0.1, lmbda=5.0)
+                    net.save('ANN_test')
+
+                    print('score = {:.2f} %'.format(net.accuracy(test_data)/100))
+                    minesweeper.terminate()
 
             # Check if reset box is clicked
             if minesweeper._RESET_RECT.collidepoint(mouse_x, mouse_y):
                 minesweeper.highlight_button(minesweeper._RESET_RECT)
                 if mouse_clicked:
                     minesweeper.new_game()
+                    has_game_ended = True
 
             # Highlight unrevealed box
             box_x, box_y = minesweeper.get_box_at_pixel(mouse_x, mouse_y)
