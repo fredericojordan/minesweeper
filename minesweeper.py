@@ -14,7 +14,7 @@ BEGINNER = (8, 8, 10)
 INTERMEDIATE = (16, 16, 40)
 EXPERT = (24, 24, 99)
 
-FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = EXPERT
+FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = BEGINNER
 
 # PERSISTENT DATA
 LOG_TO_FILE = False
@@ -69,7 +69,7 @@ class Minesweeper:
         self._display_surface = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
         self._BASICFONT = pygame.font.SysFont(FONTTYPE, FONTSIZE)
         self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH / 2, 50)
-        #         self._RESET_SURF, self._RESET_RECT = self.draw_button('RESET', TEXTCOLOR, RESETBGCOLOR, WINDOWWIDTH/2, 50)
+        # self._RESET_SURF, self._RESET_RECT = self.draw_button('RESET', TEXTCOLOR, RESETBGCOLOR, WINDOWWIDTH/2, 50)
         self._images = {
             '0': pygame.transform.scale(pygame.image.load(os.path.join('media', '0.png')), (BOXSIZE, BOXSIZE)),
             '1': pygame.transform.scale(pygame.image.load(os.path.join('media', '1.png')), (BOXSIZE, BOXSIZE)),
@@ -137,7 +137,7 @@ class Minesweeper:
 
         for box_x in range(FIELDWIDTH):
             for box_y in range(FIELDHEIGHT):
-                if self.revealed_boxes[box_x][box_y] == True:
+                if self.revealed_boxes[box_x][box_y]:
                     if self.mine_field[box_x][box_y] != MINE:
                         not_mine_count += 1
 
