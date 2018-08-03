@@ -10,11 +10,12 @@ from pygame.locals import *
 AI_ENABLED = True
 
 # DIFFICULTY
+TEST = (4, 4, 2)
 BEGINNER = (8, 8, 10)
 INTERMEDIATE = (16, 16, 40)
 EXPERT = (24, 24, 99)
 
-FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = BEGINNER
+FIELDWIDTH, FIELDHEIGHT, MINESTOTAL = TEST
 
 # PERSISTENT DATA
 LOG_TO_FILE = False
@@ -497,6 +498,10 @@ def main():
             box_x, box_y = minesweeper.get_box_at_pixel(mouse_x, mouse_y)
             if box_x is not None and box_y is not None and not minesweeper.revealed_boxes[box_x][box_y]:
                 minesweeper.highlight_box(box_x, box_y)
+
+            if minesweeper.is_game_won():
+                print('WIN!')
+                break
 
             # Update screen, wait clock tick
             pygame.display.update()
