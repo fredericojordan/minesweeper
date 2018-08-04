@@ -22,6 +22,7 @@ LOG_TO_FILE = False
 DATABASE_FILENAME = 'data.txt'
 
 # UI
+UI_ENABLED = False
 FPS = 30
 BOXSIZE = 30
 WINDOWWIDTH = FIELDWIDTH * BOXSIZE + 85
@@ -59,36 +60,41 @@ HIDDEN = -1
 
 
 class Minesweeper:
-    def __init__(self):
+    def __init__(self, ui=True):
         # random.seed(0)  # Seed the RNG for DEBUG purposes
-        pygame.init()
-        pygame.display.set_caption('Minesweeper')
-
-        self.clock = pygame.time.Clock()
-
-        # load GUI
-        self._display_surface = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
-        self._BASICFONT = pygame.font.SysFont(FONTTYPE, FONTSIZE)
-        self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH / 2, 50)
-        # self._RESET_SURF, self._RESET_RECT = self.draw_button('RESET', TEXTCOLOR, RESETBGCOLOR, WINDOWWIDTH/2, 50)
-        self._images = {
-            '0': pygame.transform.scale(pygame.image.load(os.path.join('media', '0.png')), (BOXSIZE, BOXSIZE)),
-            '1': pygame.transform.scale(pygame.image.load(os.path.join('media', '1.png')), (BOXSIZE, BOXSIZE)),
-            '2': pygame.transform.scale(pygame.image.load(os.path.join('media', '2.png')), (BOXSIZE, BOXSIZE)),
-            '3': pygame.transform.scale(pygame.image.load(os.path.join('media', '3.png')), (BOXSIZE, BOXSIZE)),
-            '4': pygame.transform.scale(pygame.image.load(os.path.join('media', '4.png')), (BOXSIZE, BOXSIZE)),
-            '5': pygame.transform.scale(pygame.image.load(os.path.join('media', '5.png')), (BOXSIZE, BOXSIZE)),
-            '6': pygame.transform.scale(pygame.image.load(os.path.join('media', '6.png')), (BOXSIZE, BOXSIZE)),
-            '7': pygame.transform.scale(pygame.image.load(os.path.join('media', '7.png')), (BOXSIZE, BOXSIZE)),
-            '8': pygame.transform.scale(pygame.image.load(os.path.join('media', '8.png')), (BOXSIZE, BOXSIZE)),
-            'hidden': pygame.transform.scale(pygame.image.load(os.path.join('media', 'hidden.png')),
-                                             (BOXSIZE, BOXSIZE)),
-            'flag': pygame.transform.scale(pygame.image.load(os.path.join('media', 'flag.png')), (BOXSIZE, BOXSIZE)),
-            'mine': pygame.transform.scale(pygame.image.load(os.path.join('media', 'mine.png')), (BOXSIZE, BOXSIZE)),
-        }
-
-        self.database = open(DATABASE_FILENAME, 'a')
         self.mine_field, self.revealed_boxes, self.flagged_mines = self.new_game()
+
+        if ui:
+            pygame.init()
+            pygame.display.set_caption('Minesweeper')
+
+            self.clock = pygame.time.Clock()
+
+            # load GUI
+            self._display_surface = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
+            self._BASICFONT = pygame.font.SysFont(FONTTYPE, FONTSIZE)
+            self._RESET_SURF, self._RESET_RECT = self.draw_smiley(WINDOWWIDTH / 2, 50)
+            # self._RESET_SURF, self._RESET_RECT = self.draw_button('RESET', TEXTCOLOR, RESETBGCOLOR, WINDOWWIDTH/2, 50)
+            self._images = {
+                '0': pygame.transform.scale(pygame.image.load(os.path.join('media', '0.png')), (BOXSIZE, BOXSIZE)),
+                '1': pygame.transform.scale(pygame.image.load(os.path.join('media', '1.png')), (BOXSIZE, BOXSIZE)),
+                '2': pygame.transform.scale(pygame.image.load(os.path.join('media', '2.png')), (BOXSIZE, BOXSIZE)),
+                '3': pygame.transform.scale(pygame.image.load(os.path.join('media', '3.png')), (BOXSIZE, BOXSIZE)),
+                '4': pygame.transform.scale(pygame.image.load(os.path.join('media', '4.png')), (BOXSIZE, BOXSIZE)),
+                '5': pygame.transform.scale(pygame.image.load(os.path.join('media', '5.png')), (BOXSIZE, BOXSIZE)),
+                '6': pygame.transform.scale(pygame.image.load(os.path.join('media', '6.png')), (BOXSIZE, BOXSIZE)),
+                '7': pygame.transform.scale(pygame.image.load(os.path.join('media', '7.png')), (BOXSIZE, BOXSIZE)),
+                '8': pygame.transform.scale(pygame.image.load(os.path.join('media', '8.png')), (BOXSIZE, BOXSIZE)),
+                'hidden': pygame.transform.scale(pygame.image.load(os.path.join('media', 'hidden.png')),
+                                                 (BOXSIZE, BOXSIZE)),
+                'flag': pygame.transform.scale(pygame.image.load(os.path.join('media', 'flag.png')), (BOXSIZE, BOXSIZE)),
+                'mine': pygame.transform.scale(pygame.image.load(os.path.join('media', 'mine.png')), (BOXSIZE, BOXSIZE)),
+            }
+
+        if LOG_TO_FILE:
+            self.database = open(DATABASE_FILENAME, 'a')
+        else:
+            self.database = None
 
     def new_game(self):
         """Set up mine field data structure, list of all zeros for recursion, and revealed box boolean data structure"""
@@ -153,9 +159,9 @@ class Minesweeper:
         if self.mine_field[selected_square[0]][selected_square[1]] == MINE:
             score = 0
         else:
-            total_safe_squares = (FIELDHEIGHT*FIELDWIDTH) - MINESTOTAL
-            safe_count = sum(column.count(True) for column in self.revealed_boxes)
-            score = float(safe_count)/float(total_safe_squares)
+            total_revealed_squares = (FIELDHEIGHT*FIELDWIDTH) - MINESTOTAL
+            revealed_count = sum(column.count(True) for column in self.revealed_boxes)
+            score = float(revealed_count)/float(total_revealed_squares)
 
         database_entry = json.dumps({
             "turn": info,
@@ -196,7 +202,6 @@ class Minesweeper:
         self.revealed_boxes[x][y] = True
 
         if self.is_game_won():
-            print('WIN!!!')
             has_game_ended = True
 
         # when 0 is revealed, show relevant boxes
@@ -303,7 +308,8 @@ class Minesweeper:
 
     def terminate(self):
         """Simple function to exit game"""
-        self.database.close()
+        if self.database:
+            self.database.close()
         pygame.quit()
         sys.exit()
 
@@ -403,33 +409,33 @@ class Minesweeper:
 
         return flagged_squares
 
-    def get_AI_safe_squares(self, available_info, guess=False):
+    def get_AI_revealed_squares(self, available_info, guess=False):
         """Returns list of squares that are sure to NOT contain mines"""
-        safe_squares = []
+        revealed_squares = []
 
         for x in range(FIELDWIDTH):
             for y in range(FIELDHEIGHT):
                 flagged = self.get_flagged_neighbours([x, y], available_info)
                 if available_info[x][y] == len(flagged):
-                    safe_squares.extend(self.get_uncertain_neighbours([x, y], available_info))
+                    revealed_squares.extend(self.get_uncertain_neighbours([x, y], available_info))
 
-        if not safe_squares and guess:
-            safe_squares.append([random.choice(range(FIELDWIDTH)), random.choice(range(FIELDHEIGHT))])
+        if not revealed_squares and guess:
+            revealed_squares.append([random.choice(range(FIELDWIDTH)), random.choice(range(FIELDHEIGHT))])
 
-        return safe_squares
+        return revealed_squares
 
     def get_AI_input(self, info):
         """Returns both the safe squares and the flagged squares"""
         # TODO: Apply flagged squares to game state before calculating safe squares
         flagged_squares = self.get_AI_flagged_squares(info)
-        safe_squares = self.get_AI_safe_squares(info, guess=True)
-        return safe_squares, flagged_squares
+        revealed_squares = self.get_AI_revealed_squares(info, guess=True)
+        return revealed_squares, flagged_squares
 
 
 def main():
     tries = 0
 
-    minesweeper = Minesweeper()
+    minesweeper = Minesweeper(ui=UI_ENABLED)
 
     # stores XY of mouse events
     mouse_x = 0
@@ -447,65 +453,67 @@ def main():
         while not has_game_ended:
             # Initialize variables
             mouse_clicked = False
-            safe_squares = []
+            revealed_squares = []
             flagged_squares = []
 
-            # Draw screen
-            minesweeper.draw_field()
+            if UI_ENABLED:
+                # Draw screen
+                minesweeper.draw_field()
+
+                # Get player input
+                for event in pygame.event.get():
+                    if event.type == QUIT or (event.type == KEYDOWN and (event.key == K_ESCAPE or event.key == K_q)):
+                        minesweeper.terminate()
+                    elif event.type == MOUSEMOTION:
+                        mouse_x, mouse_y = event.pos
+                    elif event.type == MOUSEBUTTONDOWN:
+                        if event.button == LEFT_CLICK:
+                            mouse_x, mouse_y = event.pos
+                            mouse_clicked = True
+                            box_x, box_y = minesweeper.get_box_at_pixel(mouse_x, mouse_y)
+                            if box_x is not None and box_y is not None:
+                                revealed_squares = [(box_x, box_y)]
+                        if event.button == RIGHT_CLICK:
+                            mouse_x, mouse_y = event.pos
+                            box_x, box_y = minesweeper.get_box_at_pixel(mouse_x, mouse_y)
+                            if box_x is not None and box_y is not None:
+                                flagged_squares = [(box_x, box_y)]
 
             # Get AI input
             if AI_ENABLED:
                 info = minesweeper.available_info()
-                safe_squares, flagged_squares = minesweeper.get_AI_input(info)
-
-            # Get player input
-            for event in pygame.event.get():
-                if event.type == QUIT or (event.type == KEYDOWN and (event.key == K_ESCAPE or event.key == K_q)):
-                    minesweeper.terminate()
-                elif event.type == MOUSEMOTION:
-                    mouse_x, mouse_y = event.pos
-                elif event.type == MOUSEBUTTONDOWN:
-                    if event.button == LEFT_CLICK:
-                        mouse_x, mouse_y = event.pos
-                        mouse_clicked = True
-                        box_x, box_y = minesweeper.get_box_at_pixel(mouse_x, mouse_y)
-                        if box_x is not None and box_y is not None:
-                            safe_squares = [(box_x, box_y)]
-                    if event.button == RIGHT_CLICK:
-                        mouse_x, mouse_y = event.pos
-                        box_x, box_y = minesweeper.get_box_at_pixel(mouse_x, mouse_y)
-                        if box_x is not None and box_y is not None:
-                            flagged_squares = [(box_x, box_y)]
+                revealed_squares, flagged_squares = minesweeper.get_AI_input(info)
 
             # Apply game changes
             for x, y in flagged_squares:
                 minesweeper.toggle_flag_box(x, y)
 
-            for x, y in safe_squares:
+            for x, y in revealed_squares:
                 has_game_ended = minesweeper.reveal_box(x, y)
                 if LOG_TO_FILE:
                     minesweeper.save_turn([x, y])
                 if has_game_ended:
                     break
 
-            # Check if reset box is clicked
-            if minesweeper._RESET_RECT.collidepoint(mouse_x, mouse_y):
-                minesweeper.highlight_button(minesweeper._RESET_RECT)
-                if mouse_clicked:
-                    minesweeper.new_game()
+            if UI_ENABLED:
+                # Check if reset box is clicked
+                if minesweeper._RESET_RECT.collidepoint(mouse_x, mouse_y):
+                    minesweeper.highlight_button(minesweeper._RESET_RECT)
+                    if mouse_clicked:
+                        minesweeper.new_game()
 
-            # Highlight unrevealed box
-            box_x, box_y = minesweeper.get_box_at_pixel(mouse_x, mouse_y)
-            if box_x is not None and box_y is not None and not minesweeper.revealed_boxes[box_x][box_y]:
-                minesweeper.highlight_box(box_x, box_y)
+                # Highlight unrevealed box
+                box_x, box_y = minesweeper.get_box_at_pixel(mouse_x, mouse_y)
+                if box_x is not None and box_y is not None and not minesweeper.revealed_boxes[box_x][box_y]:
+                    minesweeper.highlight_box(box_x, box_y)
 
             if minesweeper.is_game_won():
-                print('WIN!')
                 break
 
-            # Update screen, wait clock tick
-            pygame.display.update()
-            minesweeper.clock.tick(FPS)
+            if UI_ENABLED:
+                # Update screen, wait clock tick
+                pygame.display.update()
+                minesweeper.clock.tick(FPS)
 
 
 if __name__ == '__main__':
