@@ -1,14 +1,41 @@
+import json
 import numpy as np
 import tensorflow as tf
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
+DATABASE_FILENAME = 'data.txt'
+
+
+def load_data(filename):
+    turns = []
+    moves = []
+    scores = []
+
+    with open(filename, 'r') as database:
+        for line in database:
+            entry = json.loads(line)
+            if entry['score'] == 0:
+                continue
+
+            flat_turn = [item for sublist in entry['turn'] for item in sublist]
+            turns.append(np.array(flat_turn))
+
+            moves.append(np.array(entry['move']))
+
+            scores.append(np.array(entry['score']))
+            break
+
+    return {
+        "turns": np.array(turns),
+        "moves": np.array(moves),
+        "scores": np.array(scores),
+    }
+
 
 def main(args):
-    train_data = np.zeros((8, 8, 1))
-    train_labels = np.zeros((1, 1))
-    eval_data = np.zeros((8, 8, 1))
-    eval_labels = np.zeros((1, 1))
+    data = load_data(DATABASE_FILENAME)
+    return
 
     # Create the Estimator
     mnist_classifier = tf.estimator.Estimator(model_fn=cnn_model_fn, model_dir="/tmp/mnist_convnet_model")
@@ -29,14 +56,14 @@ def main(args):
         steps=20000,
         hooks=[logging_hook])
 
-    # Evaluate the model and print results
-    eval_input_fn = tf.estimator.inputs.numpy_input_fn(
-        x={"x": eval_data},
-        y=eval_labels,
-        num_epochs=1,
-        shuffle=False)
-    eval_results = mnist_classifier.evaluate(input_fn=eval_input_fn)
-    print(eval_results)
+    # # Evaluate the model and print results
+    # eval_input_fn = tf.estimator.inputs.numpy_input_fn(
+    #     x={"x": eval_data},
+    #     y=eval_labels,
+    #     num_epochs=1,
+    #     shuffle=False)
+    # eval_results = mnist_classifier.evaluate(input_fn=eval_input_fn)
+    # print(eval_results)
 
 
 def cnn_model_fn(features, labels, mode):
