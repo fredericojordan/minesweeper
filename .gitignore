@@ -1,6 +1,8 @@
-venv/
+**/.DS_Store
+*.pyc
 .idea/
 .project
 .pydevproject
-**/.DS_Store
-*.pyc
+MNIST-data/
+data.txt
+venv/
